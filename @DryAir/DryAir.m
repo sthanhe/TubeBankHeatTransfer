@@ -10,13 +10,13 @@
 %Part of the paper:
 %
 %Thanheiser, S.; Haider, M.
-%Particle Mass Diffusion Model for Level Control of Bubbling Fluidized Beds
-%with Horizontal Particle Flow
-%Powder Technology 2023
+%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
+%Particle Cross-Flow
+%Applied Thermal Energy 2024
 %
 %All required files for this class can be found in the software
 %repository:
-%https://doi.org/10.5281/zenodo.xxxxxxx
+%https://doi.org/10.5281/zenodo.7948224
 %
 %
 %
@@ -57,11 +57,11 @@ classdef DryAir
         
         function h=h(T)
             %Specific enthalpy
-            persistent tab
-            if isempty(tab)
+            % persistent tab
+            % if isempty(tab)
                 tabStruct=coder.load('@DryAir\dryAirTable.mat','tab');
                 tab=tabStruct.tab;
-            end
+            % end
             
             h=interp1(tab.T,tab.h,T);
         end
@@ -147,11 +147,11 @@ classdef DryAir
         
         function eta=eta(T) %#codegen
             %Dynamic viscosity
-            persistent tab
-            if isempty(tab)
+            % persistent tab
+            % if isempty(tab)
                 tabStruct=coder.load('@DryAir\dryAirTable.mat','tab');
                 tab=tabStruct.tab;
-            end
+            % end
             
             eta=interp1(tab.T,tab.eta,T);
         end
@@ -193,11 +193,11 @@ classdef DryAir
         function T=T_h(h)
             %Backwards-equation for temperature as function of specific
             %enthalpy
-            persistent tab
-            if isempty(tab)
+            % persistent tab
+            % if isempty(tab)
                 tabStruct=coder.load('@DryAir\dryAirTable.mat','tab');
                 tab=tabStruct.tab;
-            end
+            % end
             
             T=interp1(tab.h,tab.T,h);
         end

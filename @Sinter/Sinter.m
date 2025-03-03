@@ -5,13 +5,13 @@
 %Part of the paper:
 %
 %Thanheiser, S.; Haider, M.
-%Particle Mass Diffusion Model for Level Control of Bubbling Fluidized Beds
-%with Horizontal Particle Flow
-%Powder Technology 2023
+%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
+%Particle Cross-Flow
+%Applied Thermal Energy 2024
 %
 %All required files for this class can be found in the software
 %repository:
-%https://doi.org/10.5281/zenodo.xxxxxxx
+%https://doi.org/10.5281/zenodo.7948224
 %
 %
 %
@@ -51,11 +51,11 @@ classdef Sinter
 
 
         function [w2,w1,mDotS]=w(p1,p2,T,s,name)
-            persistent tab
-            if isempty(tab)
+            % persistent tab
+            % if isempty(tab)
                 tabStruct=coder.load('@Sinter\constants.mat','tab');
                 tab=tabStruct.tab;
-            end
+            % end
 
             % sz=implExp.size(p1,p2,T,s,name);
             % [p1,p2,T,s,name]=implExp.normalize(sz,p1,p2,T,s,name);

@@ -1,0 +1,14 @@
+classdef SLglass
+    methods(Static)
+        function c_p=c_p(T)
+            persistent A B C
+            if isempty(A)
+                A=0.828;
+                B=4.418e-4;
+                C=17185.9;
+            end
+
+            c_p=A+B.*T-C./T.^2;
+        end
+    end
+end

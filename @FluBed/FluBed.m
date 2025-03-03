@@ -5,13 +5,13 @@
 %Part of the paper:
 %
 %Thanheiser, S.; Haider, M.
-%Particle Mass Diffusion Model for Level Control of Bubbling Fluidized Beds
-%with Horizontal Particle Flow
-%Powder Technology 2023
+%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
+%Particle Cross-Flow
+%Applied Thermal Energy 2024
 %
 %All required files for this class can be found in the software
 %repository:
-%https://doi.org/10.5281/zenodo.xxxxxxx
+%https://doi.org/10.5281/zenodo.7948224
 %
 %
 %
@@ -21,8 +21,8 @@
 %
 %Requires all files packaged in the class folder and on the MATLAB path
 %
-%Required products:
-%   - MATLAB, version 9.14
+%Required products, version 24.1:
+%   - MATLAB
 %Additional classes:
 %   - DryAir
 %   - implExp
@@ -170,25 +170,48 @@ classdef FluBed
         end
 
 
-        function Gamma=Gamma(w,href,d_p,rho_p,p,T)
-            %Mass diffusivity
-            persistent C a href0
-            if isempty(C)
-                C=24968.3343446693;
-                a=1.07653015217829;
-                href0=1;
-            end
-            
-            wmf=FluBed.wmf(d_p,rho_p,p,T);
-            pi2=(w-wmf)./wmf;
+        function phi_s=eps2phi(eps_mf)
+            %Calculates sphericity phi_s from the bed porosity at minimum
+            %fluidization conditions eps_mf
+            %Based on: 
+            %Wen, C.Y. and Yu, Y.H. (1966), A generalized method for 
+            %predicting the minimum fluidization velocity. 
+            %AIChE J., 12: 610-612. https://doi.org/10.1002/aic.690120343
 
-            idx=pi2>0;
-            Gamma=zeros(size(pi2));
-            Gamma(idx)=C.*href./href0.*pi2(idx).^a.*wmf(idx).*d_p;
+            phi_s=sqrt((1-eps_mf)./(11*eps_mf.^3));
+
         end
 
 
-        function [h,Nu]=molerus(w,T_b,T_s,p,d_p,rho_p,eps_mf)
+        function D=D(w,w_p,d_p,rho_p,p,T)
+            %Particle dispersion coefficient
+            persistent c eps2 eps3 epsAr
+            if isempty(c)
+                c=19030.1124724027;
+                eps2=1.08175825313772;
+                eps3=-3.62266055421733;
+                epsAr=0.109738530498836;
+            end
+
+            den=sqrt(d_p.*FluBed.g);
+
+            pi2=(w-FluBed.wmf(d_p,rho_p,p,T))./den;
+            pi3=w_p./den;
+            Ar=FluBed.Ar(d_p,rho_p,p,T);
+
+
+            idx=pi2>0;
+            D=zeros(size(pi2));
+            if any(idx)
+                D(idx)=c.*d_p.*den.*...
+                        pi2(idx).^eps2.*...
+                        (1+pi3(idx)).^eps3.*...
+                        Ar(idx).^epsAr;
+            end
+        end
+
+
+        function [h,Nu]=molerus(w,T,p,d_p,rho_p,phi_s,eps_mf,c_pfx)
             persistent G1 G2 P1 P2 P1ast P2ast
             if isempty(G1)
                 G1=0.05;
@@ -203,28 +226,29 @@ classdef FluBed
 
 
             %Implicit expansion
-            sz=implExp.size(w,T_b,T_s,p,d_p,rho_p,eps_mf);
-            [w,T_b,T_s,p,d_p,rho_p,eps_mf]=implExp.normalize(sz,w,T_b,T_s,p,d_p,rho_p,eps_mf);
+            sz=implExp.size(w,T,p,d_p,rho_p,phi_s,eps_mf);
+            [w,T,p,d_p,rho_p,phi_s,eps_mf]=implExp.normalize(sz,w,T,p,d_p,rho_p,phi_s,eps_mf);
 
             
             %Gas and particle properties
-            k_g=DryAir.lambda(T_s);
-            my=DryAir.eta(T_b);
-            c_p=SiO2.c_p(T_b);
-            rho_g=DryAir.rho(p,T_b);
+            k_g=DryAir.lambda(T);     %Surface temperature?
+            my=DryAir.eta(T);
+            c_p=c_pfx(T);
+            rho_g=DryAir.rho(p,T);
             rho_e=rho_p-rho_g;      %Excess density
 
 
             %Fluidization velocities
-            w_mf=FluBed.wmf(d_p,rho_p,p,T_b);   %Minimum
-            w_e=w-w_mf;                         %Excess
-            w_e(w_e<0)=NaN;                     %Avoid complex results
+            % w_mf=FluBed.wmf(d_p,rho_p,p,T);     %Minimum
+            w_mf=FluBed.wmfErgun(d_p,rho_p,phi_s,eps_mf,p,T);   %Minimum
+            w_e=w-w_mf;                                         %Excess
+            w_e(w_e<0)=NaN;                                     %Avoid complex results
 
 
             %Pi-factors, p. 70
             %pi1=Nu;
             pi2=k_g./(2*c_p.*my);
-            pi3=DryAir.Pr(T_s);
+            pi3=DryAir.Pr(T);     %Surface temperature?
             pi4=rho_g./rho_e;
             pi5=(rho_p.*c_p./(k_g.*FluBed.g)).^(1/3).*w_e;
             pi6=w_e./w_mf;
@@ -243,14 +267,14 @@ classdef FluBed
 
 
             %Maximum gas convective HTC (turbulent flow regime), Section 4.4
-            Nu_gcMax=G2*pi3.^(1/3);
-            h_gcMax=Nu_gcMax.*k_g./l_t;
+            Nu_gcMax=G2*pi3.^(1/3).*turb2lam;
+            h_gcMax=Nu_gcMax.*k_g./l_l;
 
 
             %Gas convection, Section 7.3
             gfx=(1+G1*pi6.^-1).^-1;     %g(w_e) damping function
             Nu_gc=Nu_gcMax.*gfx;        %Nusselt number for gas convection
-            h_gc=Nu_gc.*k_g./l_t;       %HTC gas convection
+            h_gc=Nu_gc.*k_g./l_l;       %HTC gas convection
 
 
             %Pure particle convection, Section 7.5
@@ -260,18 +284,18 @@ classdef FluBed
             
 
             %Mixed particle convection, Section 7.6
-            dfx=0.28*pi2.*pi7.^2.*sqrt(pi4).*pi5.^2.*pi6.^-1;     %d(w_e) damping function
-            Nu_pcMix=P2ast*pi7./(1+pi2+dfx).*pfx(P1ast);          %Nusselt number for mixed particle convection
-            h_pcMix=Nu_pcMix.*k_g./l_l;                           %HTC mixed particle convection
+            dfx=0.28*pi2.*pi7.^2.*sqrt(pi4).*pi5.^2.*pi6.^-1;   %d(w_e) damping function
+            Nu_pcMix=P2ast*pi7./(1+pi2+dfx).*pfx(P1ast);        %Nusselt number for mixed particle convection
+            h_pcMix=Nu_pcMix.*k_g./l_l;                         %HTC mixed particle convection
 
 
             %Mixed gas and particle convection, Section 7.6
-            Nu_mix=Nu_pcMix+Nu_gc.*turb2lam;
+            Nu_mix=Nu_pcMix+Nu_gc;
             h_mix=Nu_mix.*k_g./l_l;
 
 
             %Flow regimes, Section 4
-            Ar=FluBed.Ar(d_p,rho_p,p,T_b);
+            Ar=FluBed.Ar(d_p,rho_p,p,T);
             lam=Ar<=1e2;
             mix=1e2<Ar & Ar<1e5;
             turb=1e5<=Ar & Ar<=1e8;
@@ -281,28 +305,143 @@ classdef FluBed
             Nu_total=NaN(size(Ar));
             Nu_total(lam)=Nu_pcPure(lam);
             Nu_total(mix)=Nu_mix(mix);
-            Nu_total(turb)=Nu_gc(turb).*turb2lam(turb);
+            Nu_total(turb)=Nu_gc(turb);
             h_total=Nu_total.*k_g./l_l;
 
 
             %Build output structures
             r=@(x) reshape(x,sz);
-            Nu=struct('total',r(Nu_total),'gcMax',r(Nu_gcMax),'pcMax',r(Nu_pcMax),'gc',r(Nu_gc),'pcPure',r(Nu_pcPure),'pcMix',r(Nu_pcMix),'mix',r(Nu_mix));
-            h=struct('total',r(h_total),'gcMax',r(h_gcMax),'pcMax',r(h_pcMax),'gc',r(h_gc),'pcPure',r(h_pcPure),'pcMix',r(h_pcMix),'mix',r(h_mix));
+            Nu=struct('total',r(Nu_total),...
+                    'gcMax',r(Nu_gcMax),'pcMax',r(Nu_pcMax),...
+                    'gc',r(Nu_gc),'pcPure',r(Nu_pcPure),'pcMix',r(Nu_pcMix),...
+                    'mix',r(Nu_mix));
+            h=struct('total',r(h_total),...
+                    'gcMax',r(h_gcMax),'pcMax',r(h_pcMax),...
+                    'gc',r(h_gc),'pcPure',r(h_pcPure),'pcMix',r(h_pcMix),...
+                    'mix',r(h_mix));
         end
-    end
+
+
+        function [h,Nu]=molExt(w,T,p,d_p,rho_p,phi_s,eps_mf,c_pfx,...
+                d_t,p_h,w_p)
+            %Molerus' heat transfer correlation, extended (mixed regime
+            %only)
+            persistent G1 G2 P1 P2 P3 P4 %P5
+            if isempty(G1)
+                G1=0.165;
+                G2=0.05;
+
+                %s3 old
+                % P1=0.0669009973829433;
+                % P2=0.331251286752616;
+                % P3=19.4345474590870;
+                % 
+                % P4=4.49720169564995e-05;
+                % P5=-0.959145413661024;
+
+
+                %s3
+                % P1=0.0696085079075269;
+                % P2=19.8830853275972;
+                % 
+                % P3=5.37302742339688e-05;
+                % P4=1.01505510898379;
+
+                %s2
+                P1=0.0690771105844349;
+                P2=18.9085028208424;
+
+                P3=6.45824254376922e-05;
+                P4=1.15226744565364;
+            end
+            
+
+            %Gas and particle properties
+            k_g=DryAir.lambda(T);
+            my_g=DryAir.eta(T);
+            rho_g=DryAir.rho(p,T);
+            rho_e=rho_p-rho_g;
+            l_l=(my_g./(rho_e.*sqrt(FluBed.g))).^(2/3);
+            c_p=c_pfx(T);
+            
+            
+            %Fluidization velocities
+            w_mf=FluBed.wmfErgun(d_p,rho_p,phi_s,eps_mf,p,T);
+            w_e=w-w_mf;
+            w_e(w_e<0)=NaN;
+            
+            
+            %Pi-factors            
+            % pi1=h.*l_l./k_g;
+            pi2=k_g./(2*c_p.*my_g);
+            pi3=DryAir.Pr(T);
+            pi4=rho_g./rho_e;
+            pi5=(rho_e.*c_p./(k_g.*FluBed.g)).^(1/3).*w_e;
+            pi6=(rho_e.*c_p./(k_g.*FluBed.g)).^(1/3).*w_mf;
+            pi7=1-eps_mf;
+            pi8=d_t./l_l;
+            pi9=d_t./p_h;
+            pi10=(rho_e.*c_p./(k_g.*FluBed.g)).^(1/3).*w_p;
+
+
+            %Gas convection
+            Nu_gcMax=G1*(pi3.*pi4).^(1/3);
+
+            d_gc=(1+G2*pi6./pi5).^-1;
+            Nu_gc=Nu_gcMax.*d_gc;
+
+
+            %Particle convection
+            %s3 old
+            % t=1+P2.*pi7.^2.*sqrt(pi4).*pi5.*pi6;
+            % s=tanh(P4.*pi8);
+            % Nu_pcMax=P1.*pi7./(1+pi2.*t.*s);
+
+            %s3
+            % t=1+0.28.*pi7.^2.*sqrt(pi4).*pi5.*pi6;
+            % s=tanh(P3.*pi8);
+            % Nu_pcMax=P1.*pi7./(1+pi2.*t.*s);
+
+            %s2
+            t=1+0.28.*pi7.^2.*sqrt(pi4).*pi5.*pi6;
+            s=1-exp(-P3.*pi8);
+            Nu_pcMax=P1.*pi7./(1+pi2.*t.*s);
+
+
+            %s3 old
+            % pfx=(1-pi9).^P5;
+            % d_pc=(1+P3.*(pi6./pi5).^(1/3)./pi5.*pfx).^-1;
+            % Nu_pc=Nu_pcMax.*d_pc;
     
-    
-    
-    methods(Static) %, Access=protected
+            %s3 and s2
+            pfx=(1-pi9).^P4;
+            d_pc=(1+P2.*(pi6./pi5).^(1/3)./pi5./pfx).^-1;
+            Nu_pc=Nu_pcMax.*d_pc;
+
+
+            %Heat transfer regimes: only use mixed
+            Ar=FluBed.Ar(d_p,rho_p,p,T);
+            mix=1e2<=Ar & Ar<=1e5;
+
+
+            %Mixed gas and particle convection
+            Nu=NaN(size(Ar));
+            Nu(mix)=Nu_gc(mix)+Nu_pc(mix);
+            h=Nu.*k_g./l_l;
+        end
+
+
         function Ar=Ar(d_p,rho_p,p,T_A)
             %Archimedes number, assuming dry air as fluidizing gas
             rho_g=DryAir.rho(p,T_A);
 
             Ar=rho_g.*d_p.^3.*(rho_p-rho_g).*FluBed.g./DryAir.eta(T_A).^2;
         end
-
-
+    end
+    
+    
+    
+    methods(Static, Access=protected)
         function Re=Re(d_p,w,p,T)
             %Reynolds number with respect to particle diameter
             Re=d_p.*w./(DryAir.ny(p,T));
