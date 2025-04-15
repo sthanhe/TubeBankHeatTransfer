@@ -31,105 +31,31 @@
 %% Influencing factors
 %Original influencing factors from Molerus
 h=struct('name','h','unit','W/m²K');
-g=struct('name','g','unit','m/s²');
-rho_p_rho_g=struct('name','rho_p_rho_g','unit','kg/m³');
-c_p=struct('name','c_p','unit','J/kgK');
-my_g=struct('name','my_g','unit','Pas');
-rho_g=struct('name','rho_g','unit','kg/m³');
 c_g=struct('name','c_g','unit','J/kgK');
+c_p=struct('name','c_p','unit','J/kgK');
+rho_g=struct('name','rho_g','unit','kg/m³');
+rho_p_rho_g=struct('name','rho_p_rho_g','unit','kg/m³');
+my_g=struct('name','my_g','unit','Pas');
 k_g=struct('name','k_g','unit','W/mK');
-w_mf=struct('name','w_mf','unit','m/s');
-eps_mf=struct('name','eps_mf','unit','');
 w_e=struct('name','w_e','unit','m/s');
+w_mf=struct('name','w_mf','unit','m/s');
+eps_mf=struct('name','eps_mf','unit','');   %Actually: 1-eps_mf
+g=struct('name','g','unit','m/s²');
 
 
 %Own (added) influencing factors
-s_h=struct('name','s_h','unit','');
-p_h=struct('name','p_h','unit','m');
 d_t=struct('name','d_t','unit','m');
+p_h=struct('name','p_h','unit','m');
 w_p=struct('name','w_p','unit','m/s');
 
 
-%% Maximum heat transfer in laminar regime
-% results in same dimensionless variables as in Molerus
-
-[A,B,C,D]=dimMat(h,c_p,...
-            k_g,rho_p_rho_g,g,my_g);
-
-setLam=dimSet(A,B,C,D);
-
-
-%% Maximum HTC in laminar regime including tube diameter
-% results in same dimensionless variables as in Molerus, plus d_t/l_l
-
-[A,B,C,D]=dimMat(h,c_p,d_t,...
-            k_g,rho_p_rho_g,g,my_g);
-
-setLamDt=dimSet(A,B,C,D);
-
-
-%% Maximum HTC in turbulent regime
-% Molerus suggests that pi_1 and pi_3 are coupled via: pi_1*pi_3^(-1/3)
-%pi_1=h*l_l/k_g
-%pi_3=rho_g/(rho_p-rho_g)
-%pi_1*pi_3^(-1/3)=h*l_t/k_g
-
-
-[A,B,C,D]=dimMat(h,c_g,rho_g,...
-            k_g,rho_p_rho_g,g,my_g);
-
-setTurb=dimSet(A,B,C,D);
-
-
-%% Molerus dimensional analysis with all factors
-% pi1...pi4 and pi_7 are identical to Molerus (pi_2 is reversed)
-% Molerus' pi_6=replace pi_6 with pi_5/pi_6
-% Molerus' pi_5=replace pi_5 with pi_5*pi_2^(1/3)
-% or: small variations of the D-matrix (=linear combinations of pi-factors)
-
-
-[A,B,C,D]=dimMat(h,c_p,c_g,rho_g,w_e,w_mf,eps_mf,...
-            k_g,rho_p_rho_g,g,my_g);
-
-
-D{'pi2','c_p'}=-1;
-D{'pi5','c_p'}=1/3;
-D{'pi6','w_e'}=1;
-D{'pi6','w_mf'}=-1;
-
-
-setMolerus=dimSet(A,B,C,D);
-
-
-%% Mixed regime including particle cross-flow
-%3 dimensionless velocities: w_e (pi_5), w_mf (pi_6) and w_p (pi_8)
-%All include the same factor, relating particle convection to conduction
-%Molerus' pi_6=pi_5/pi_6
-
-
-[A,B,C,D]=dimMat(h,c_p,c_g,rho_g,w_e,w_mf,eps_mf,w_p,...
-            k_g,rho_p_rho_g,g,my_g);
-
-
-D{'pi2','c_p'}=-1;
-D{'pi5','c_p'}=1/3;
-D{'pi6','c_p'}=1/3;
-% D{'pi6','w_e'}=1;
-% D{'pi6','w_mf'}=-1;
-D{'pi8','c_p'}=1/3;
-% D{'pi8','w_mf'}=1/3;
-
-
-setMolerusWp=dimSet(A,B,C,D);
-
-
 %% New dimensional analysis with all new factors
-
-
+%Dimensional matrices
 [A,B,C,D]=dimMat(h,c_p,c_g,rho_g,w_e,w_mf,eps_mf,d_t,p_h,w_p,...
             k_g,rho_p_rho_g,g,my_g);
 
 
+%Modifications of D
 D{'pi2','c_p'}=-1;
 D{'pi5','c_p'}=1/3;
 D{'pi6','c_p'}=1/3;
@@ -138,7 +64,13 @@ D{'pi9','p_h'}=-1;
 D{'pi10','c_p'}=1/3;
 
 
-setNew=dimSet(A,B,C,D);
+%Dimensional set
+[setNew,C]=dimSet(A,B,C,D);
+
+
+%% Check linear independence
+checkMat=[D{:,:},C{:,:}]*[B{:,:},A{:,:}]';
+check=all(abs(checkMat)<1e-6,'all');
 
 
 %% Auxiliary functions
@@ -243,7 +175,7 @@ end
 
 
 %This function calculates the C matrix and creates the dimensional set
-function set=dimSet(A,B,C,D)
+function [set,C]=dimSet(A,B,C,D)
     %Fundamental equation
     Cmat=-D{:,:}*(A{:,:}^-1*B{:,:})';
     
@@ -256,3 +188,7 @@ function set=dimSet(A,B,C,D)
     %Dimensional set
     set=[B,A;D,C];
 end
+
+
+
+

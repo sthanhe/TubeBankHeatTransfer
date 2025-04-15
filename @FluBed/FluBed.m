@@ -326,108 +326,81 @@ classdef FluBed
                 d_t,p_h,w_p)
             %Molerus' heat transfer correlation, extended (mixed regime
             %only)
-            persistent G1 G2 P1 P2 P3 P4 %P5
+            persistent G1 G2 P1 P2 P3 P4 C1 C2 C3 C4
             if isempty(G1)
                 G1=0.165;
                 G2=0.05;
 
-                %s3 old
-                % P1=0.0669009973829433;
-                % P2=0.331251286752616;
-                % P3=19.4345474590870;
-                % 
-                % P4=4.49720169564995e-05;
-                % P5=-0.959145413661024;
-
-
-                %s3
-                % P1=0.0696085079075269;
-                % P2=19.8830853275972;
-                % 
-                % P3=5.37302742339688e-05;
-                % P4=1.01505510898379;
-
-                %s2
+                
                 P1=0.0690771105844349;
                 P2=18.9085028208424;
 
                 P3=6.45824254376922e-05;
                 P4=1.15226744565364;
+
+
+                C1=0.0124277981252216;
+                C2=0.242901965640370;
+                C3=1.63634185340022;
+                C4=0.616116450106231;
             end
-            
-
-            %Gas and particle properties
-            k_g=DryAir.lambda(T);
-            my_g=DryAir.eta(T);
-            rho_g=DryAir.rho(p,T);
-            rho_e=rho_p-rho_g;
-            l_l=(my_g./(rho_e.*sqrt(FluBed.g))).^(2/3);
-            c_p=c_pfx(T);
-            
-            
-            %Fluidization velocities
-            w_mf=FluBed.wmfErgun(d_p,rho_p,phi_s,eps_mf,p,T);
-            w_e=w-w_mf;
-            w_e(w_e<0)=NaN;
-            
-            
-            %Pi-factors            
-            % pi1=h.*l_l./k_g;
-            pi2=k_g./(2*c_p.*my_g);
-            pi3=DryAir.Pr(T);
-            pi4=rho_g./rho_e;
-            pi5=(rho_e.*c_p./(k_g.*FluBed.g)).^(1/3).*w_e;
-            pi6=(rho_e.*c_p./(k_g.*FluBed.g)).^(1/3).*w_mf;
-            pi7=1-eps_mf;
-            pi8=d_t./l_l;
-            pi9=d_t./p_h;
-            pi10=(rho_e.*c_p./(k_g.*FluBed.g)).^(1/3).*w_p;
 
 
+            %Implicit expansion
+            sz=implExp.size(w,T,p,d_p,rho_p,phi_s,eps_mf,...
+                d_t,p_h,w_p);
+            [w,T,p,d_p,rho_p,phi_s,eps_mf,...
+                d_t,p_h,w_p]=implExp.normalize(sz,w,T,p,d_p,rho_p,phi_s,...
+                    eps_mf,d_t,p_h,w_p);
+
+
+            %Pi-factors
+            [pi,k_g,l_lam]=FluBed.piFactors(w,T,p,d_p,rho_p,phi_s,eps_mf,...
+                c_pfx(T),d_t,p_h,w_p);
+            pi=pi';
+            
+            
             %Gas convection
-            Nu_gcMax=G1*(pi3.*pi4).^(1/3);
+            Nu_gcMax=G1*(pi(3,:).*pi(4,:)).^(1/3);
 
-            d_gc=(1+G2*pi6./pi5).^-1;
+            d_gc=(1+G2*pi(6,:)./pi(5,:)).^-1;
             Nu_gc=Nu_gcMax.*d_gc;
 
 
             %Particle convection
-            %s3 old
-            % t=1+P2.*pi7.^2.*sqrt(pi4).*pi5.*pi6;
-            % s=tanh(P4.*pi8);
-            % Nu_pcMax=P1.*pi7./(1+pi2.*t.*s);
+            t=1+0.28.*pi(7,:).^2.*sqrt(pi(4,:)).*pi(5,:).*pi(6,:);
+            s=1-exp(-P3.*pi(8,:));
+            Nu_pcMax=P1.*pi(7,:)./(1+pi(2,:).*t.*s);
 
-            %s3
-            % t=1+0.28.*pi7.^2.*sqrt(pi4).*pi5.*pi6;
-            % s=tanh(P3.*pi8);
-            % Nu_pcMax=P1.*pi7./(1+pi2.*t.*s);
-
-            %s2
-            t=1+0.28.*pi7.^2.*sqrt(pi4).*pi5.*pi6;
-            s=1-exp(-P3.*pi8);
-            Nu_pcMax=P1.*pi7./(1+pi2.*t.*s);
-
-
-            %s3 old
-            % pfx=(1-pi9).^P5;
-            % d_pc=(1+P3.*(pi6./pi5).^(1/3)./pi5.*pfx).^-1;
-            % Nu_pc=Nu_pcMax.*d_pc;
-    
-            %s3 and s2
-            pfx=(1-pi9).^P4;
-            d_pc=(1+P2.*(pi6./pi5).^(1/3)./pi5./pfx).^-1;
+            pfx=(1-pi(9,:)).^P4;
+            d_pc=(1+P2.*(pi(6,:)./pi(5,:)).^(1/3)./pi(5,:)./pfx).^-1;
             Nu_pc=Nu_pcMax.*d_pc;
+
+
+            %Cross-flow
+            Nu_cf=C1.*pi(7,:)./(1+C2.*(pi(6,:)./pi(10,:)).^(1/3)./pi(10,:).*t.*s);
+
+            d_cf=1-tanh((pi(5,:)./pi(6,:)).^C3.*(pi(5,:)./pi(10,:)).^C4.*...
+                (1-pi(9,:)).^(C3+C4));
+            Nu_cf=Nu_cf.*d_cf;
+            Nu_cf(pi(10,:)==0)=0;
 
 
             %Heat transfer regimes: only use mixed
             Ar=FluBed.Ar(d_p,rho_p,p,T);
             mix=1e2<=Ar & Ar<=1e5;
 
+            Nu_mix=NaN(size(Ar));
+            Nu_mix(mix)=Nu_gc(mix)+Nu_pc(mix)+Nu_cf(mix);
 
-            %Mixed gas and particle convection
-            Nu=NaN(size(Ar));
-            Nu(mix)=Nu_gc(mix)+Nu_pc(mix);
-            h=Nu.*k_g./l_l;
+
+            %Build output structures
+            r=@(x) reshape(x,sz);
+            f=k_g./l_lam;
+            Nu=struct('total',r(Nu_mix),...
+                    'gc',r(Nu_gc),'pc',r(Nu_pc),'cf',r(Nu_cf));
+            h=struct('total',r(Nu_mix.*f),...
+                    'gc',r(Nu_gc.*f),'pc',r(Nu_pc.*f),'cf',r(Nu_cf.*f));
         end
 
 
@@ -436,6 +409,41 @@ classdef FluBed
             rho_g=DryAir.rho(p,T_A);
 
             Ar=rho_g.*d_p.^3.*(rho_p-rho_g).*FluBed.g./DryAir.eta(T_A).^2;
+        end
+
+
+        function [pis,k_g,l_lam]=piFactors(w,T,p,d_p,rho_p,phi_s,eps_mf,...
+                c_p,d_t,p_h,w_p)
+            %Gas and particle properties
+            k_g=DryAir.lambda(T);
+            my_g=DryAir.eta(T);
+            rho_g=DryAir.rho(p,T);
+            rho_e=rho_p-rho_g;
+            l_lam=(my_g./(rho_e.*sqrt(FluBed.g))).^(2/3);
+            
+            
+            %Fluidization velocities
+            w_mf=FluBed.wmfErgun(d_p,rho_p,phi_s,eps_mf,p,T);
+            w_e=w-w_mf;
+            w_e(w_e<0)=NaN;
+            
+            
+            %Pi-factors
+            pis=NaN(numel(w),10);
+            % pis(:,1)=h.*l_lam./k_g;
+            pis(:,2)=k_g./(2*c_p.*my_g);
+            pis(:,3)=DryAir.Pr(T);
+            pis(:,4)=rho_g./rho_e;
+            pis(:,5)=(rho_e.*c_p./(k_g.*FluBed.g)).^(1/3).*w_e;
+            pis(:,6)=(rho_e.*c_p./(k_g.*FluBed.g)).^(1/3).*w_mf;
+            pis(:,7)=1-eps_mf;
+            pis(:,8)=d_t./l_lam;
+            pis(:,9)=d_t./p_h;
+            pis(:,10)=(rho_e.*c_p./(k_g.*FluBed.g)).^(1/3).*w_p;
+
+            %Limit pi9
+            pis(pis(:,9)<0 | 1<pis(:,9),9)=NaN;
+            pis(isinf(p_h),9)=0;
         end
     end
     

@@ -1,4 +1,4 @@
-function covplot(X,labels,figidx)
+function [fig,t]=covplot(X,labels,figidx)
     %Create default labels if they are missing
     if isempty(labels)
         labels=compose('X%d',1:size(X,2));
