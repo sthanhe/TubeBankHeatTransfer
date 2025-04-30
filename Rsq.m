@@ -1,20 +1,31 @@
-function Rsq=Rsq(y,yest,M)
+function Rsq=Rsq(y,yHat,M)
+    %y: observed data
+    %yHat: estimated / predicted / modeled / fitted data
+    %M: (optional) number of regressors excluding intercept
+    
+
+    %Normalize inputs
     n=numel(y);
-    y=reshape(y,n,1);           %Observed data
-    yest=reshape(yest,n,1);     %Estimated / predicted / modeled / fitted data
+    y=reshape(y,n,1);           
+    yHat=reshape(yHat,n,1);     
 
-    res=yest-y;                     %Residuals
-    ymean=mean(y,'omitmissing');    %Mean of observed data
 
-    SSE=sum(res.^2,'omitmissing');          %Sum of squared errors
-    SST=sum((y-ymean).^2,'omitmissing');    %Total sum of squares
+    %Regular coefficient of determination
+    epsHat=yHat-y;                  %Residuals
+    yBar=mean(y,'omitmissing');     %Mean of observed data
+
+    SSE=sum(epsHat.^2,'omitmissing');       %Sum of squared errors
+    SST=sum((y-yBar).^2,'omitmissing');     %Total sum of squares
 
     Rsq=1-SSE./SST;     %Coefficient of determination
 
 
+    %Adjusted coefficient of determination
     if nargin>2
-        %M=number of regressors excluding intercept
-        n=nnz(y);
         Rsq=1-(n-1)./(n-M).*(1-Rsq);
     end
 end
+
+
+
+

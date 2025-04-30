@@ -1,4 +1,11 @@
-fname='extLit.mat';
+dirFigures=['Figures',filesep,'PCmodels'];   %Path to directory where figures should be stored
+fname='secData.mat';
+
+
+%% Make figure and table folders if they do not exist
+if ~isfolder(dirFigures)
+    mkdir(dirFigures);
+end
 
 
 %% Load data
@@ -6,8 +13,8 @@ load(fname);
 
 
 %Create response variable y and regressor matrix X: only data from Grewal
-idx=strcmp(tab.Author,'Grewal');
-y=pis.pi1(idx)-tab.Nu_gcMol(idx);
+idx=strcmp(sec.Author,'Grewal');
+y=pis.pi1(idx)-sec.Nu_gcMW(idx);
 X=pis{idx,:};
 
 
@@ -22,24 +29,12 @@ fx0=@(b,x) ...
 
 beta_s0=[0.125,0.28,33.3,Inf,0]';
 
-checkFit(X,y,fx0,beta_s0,'s0',600);
-plotFit(X,y,fx0,beta_s0,['Figures',filesep,'Table6_s0'],601);
+checkFit(X,y,fx0,beta_s0,'s0',601,false,dirFigures);
+checkFit(X,y,fx0,beta_s0,'s0',600,true,dirFigures);
 
-
-%Coefficient of determination
-y_mean=mean(y);
-y_est=fx0(beta_s0,X);
-res=y-y_est;
-
-SSE=sum(res.^2);
-SST=sum((y-y_mean).^2);
-R2=1-SSE./SST;
-
-n=numel(y);
-M=9;    %Number of regressors excluding intercept
-R2_adj=1-(n-1)./(n-M).*(1-R2);
-
-
+compSec(fx0,beta_s0,dirFigures,0,true);
+compPi8(fx0,beta_s0,dirFigures,0,true);
+compPi9(fx0,beta_s0,dirFigures,0,true);
 
 
 %% Model s1
@@ -55,12 +50,15 @@ beta0=[0.125,33.3,5e-8,1,2]';
 
 [mdl_s1,beta_s1]=getFit(X,y,fx1,beta0);
 
-checkFit(X,y,fx1,beta_s1,'s1',610);
-plotFit(X,y,fx1,beta_s1,['Figures',filesep,'Table6_s1'],611);
+checkFit(X,y,fx1,beta_s1,'s1',611,false,dirFigures);
+checkFit(X,y,fx1,beta_s1,'s1',610,true,dirFigures);
+
+compSec(fx1,beta_s1,dirFigures,1,true);
+compPi8(fx1,beta_s1,dirFigures,1,true);
+compPi9(fx1,beta_s1,dirFigures,1,true);
 
 
 %% Model s2
-% factor 1/40 the expected value
 fx2=@(b,x) ...
     b(1).*x(:,7)./...
     (1+x(:,2).*...
@@ -73,14 +71,15 @@ beta0=[0.125,33.3,5e-5,1]';
 
 [mdl_s2,beta_s2]=getFit(X,y,fx2,beta0);
 
-checkFit(X,y,fx2,beta_s2,'s2',620);
-plotFit(X,y,fx2,beta_s2,['Figures',filesep,'Table6_s2'],621);
+checkFit(X,y,fx2,beta_s2,'s2',621,false,dirFigures);
+checkFit(X,y,fx2,beta_s2,'s2',620,true,dirFigures);
+
+compSec(fx2,beta_s2,dirFigures,2,true);
+compPi8(fx2,beta_s2,dirFigures,2,true);
+compPi9(fx2,beta_s2,dirFigures,2,true);
 
 
 %% Model s3
-% factor still 1/10 the
-%expected value. Slightly worse R²_adj, but fewer outliers. b(3)
-%practically identical to Molerus (0.28). AIC=-148.9956
 fx3=@(b,x) ...
     b(1).*x(:,7)./...
     (1+x(:,2).*...
@@ -93,37 +92,49 @@ beta0=[0.125,33.3,5e-5,1]';
 
 [mdl_s3,beta_s3]=getFit(X,y,fx3,beta0);
 
-checkFit(X,y,fx3,beta_s3,'s3',630);
-plotFit(X,y,fx3,beta_s3,['Figures',filesep,'Table6_s3'],631);
+checkFit(X,y,fx3,beta_s3,'s3',631,false,dirFigures);
+checkFit(X,y,fx3,beta_s3,'s3',630,true,dirFigures);
+
+compSec(fx3,beta_s3,dirFigures,3,true);
+compPi8(fx3,beta_s3,dirFigures,3,true);
+compPi9(fx3,beta_s3,dirFigures,3,true);
 
 
-%% s2 compared to Molerus
-pidx=[1,3:5];
-names={'Parameter','H0','Estimate','p'};
-para=table('Size',[length(pidx)+1,length(names)],...
+%% Evaluation
+%Hypothesis tests (p-values of parameters)
+para1=hyptest(X,y,fx1,beta_s1,[beta_s0;0],[1,3:6]);
+para2=hyptest(X,y,fx2,beta_s2,beta_s0,[1,3:5]);
+para3=hyptest(X,y,fx3,beta_s3,beta_s0,[1,3:5]);
+
+
+%Goodness-of-fit parameters
+mdls={mdl_s1;mdl_s2;mdl_s3};
+names={'Model','R2_adj','AIC'};
+gof=table('Size',[length(mdls)+1,length(names)],...
     'VariableTypes',[{'string'},repmat({'double'},1,length(names)-1)],...
     'VariableNames',names);
 
+gof.Model=compose('s%d',0:length(mdls))';
 
-para.Parameter=[compose('P%d',pidx),{'All'}]';
-para.H0(1:end-1)=beta_s0(pidx);
-para.Estimate(1:end-1)=beta_s2;
+gof.R2_adj(1)=Rsq(y,fx0(beta_s0,X),9);
+gof.R2_adj(2:end)=cellfun(@(x) x.Rsquared.Adjusted,mdls);
 
-
-for i=1:height(para)-1
-    beta_null=para.Estimate;
-    beta_null(i)=para.H0(i);
-
-    [~,p]=ttest(fx2(beta_null,X),y);
-    para.p(i)=p;
-end
+gof.AIC(1)=NaN;
+gof.AIC(2:end)=cellfun(@(x) x.ModelCriterion.AIC,mdls);
 
 
-beta_null=para.H0;
-[~,para.p(end)]=ttest(fx2(beta_null,X),y);
+%% Plot graphics
+%Choose best model
+fx=fx2;
+beta_s=beta_s2;
+mdl=mdl_s2;
 
 
-%% Plot graphic
+%Comparison to secondary data (for manuscript)
+compSec(fx,beta_s,dirFigures,7,false);
+
+
+%Set up figure
 figidx=5;
 fig=figure(figidx);
 clf(fig);
@@ -136,7 +147,7 @@ hold(ax,'on');
 legItems=cell(1,2);
 
 legItems{1}=scatter(ax,y,fx0(beta_s0,X),18,'o');
-legItems{2}=scatter(ax,y,fx2(beta_s2,X),18,'+');
+legItems{2}=scatter(ax,y,fx(beta_s,X),18,'+');
 
 lim=max([ax.XLim(2),ax.YLim(2)]);
 eq=linspace(0,lim,100);
@@ -149,16 +160,16 @@ hold(ax,'off');
 
 
 legItems=[legItems{:}];
-txt=subsz(compose('H_%d, R^2_{adj}=%.3f',...
-    [0;1],[R2_adj;mdl_s2.Rsquared.Adjusted]),6);
+txt=figaux.subsz(compose('H_%d, R^2_{adj}=%.3f',...
+    [0;1],[gof.R2_adj(1);mdl.Rsquared.Adjusted]),6);
 lgd=legend(ax,legItems,txt,'Location','southeast');
 
 
 ax.XLim=[0,lim];
 ax.YLim=[0,lim];
 
-xlabel(ax,subsz('Measured Nu_{pc} (-)',6));
-ylabel(ax,subsz('Estimated Nu_{pc} (-)',6));
+xlabel(ax,figaux.subsz('Measured Nu_{pc} (-)',6));
+ylabel(ax,figaux.subsz('Estimated Nu_{pc} (-)',6));
 
 
 %Text size
@@ -185,106 +196,5 @@ fig.Position(3:4)=t.OuterPosition(3:4)+0.5;
 exportgraphics(fig,[fname,'.eps']);
 
 
-% %%
-% idx=strcmp(tab.Author,'Grewal') & strcmp(tab.Material,'Silica');
-% tab2=tab(idx,:);
-% pis=pis(idx,:);
-% 
-% 
-% p=mean(tab2.p);     %constant
-% T=mean(tab2.T);     %constant
-% 
-% my_g=DryAir.eta(T);         %constant
-% rho_g=DryAir.rho(p,T);      %constant
-% rho_p=mean(tab2.rho_p);     %constant
-% rho_e=rho_p-rho_g;          %constant
-% c_p=mean(tab2.c_p);         %constant
-% c_g=mean(tab2.c_g);         %constant
-% l_l=(my_g./(rho_e.*sqrt(FluBed.g))).^(2/3);     %constant
-% 
-% pi2=mean(pis.pi2,'omitmissing');    %constant
-% pi4=mean(pis.pi4,'omitmissing');    %constant
-% pi5=mean(pis.pi5,'omitmissing');    %varying
-% pi6=mean(pis.pi6,'omitmissing');    %varying
-% pi7=mean(pis.pi7,'omitmissing');    %varying
-% 
-% d_t=[linspace(0,40e-3,100),Inf];
-% pi8=d_t./l_l;   %varying with d_t only
-% 
-% d_p=mean(tab2.d_p);     %varying
-% Ar=rho_g.*d_p.^3.*rho_e.*FluBed.g./my_g.^2;
-% 
-% 
-% % my_g=1.96e-5;
-% % k_g=0.149;
-% % c_p=1000;
-% % rho_g=0.1785;
-% % rho_p=1000;
-% % rho_e=rho_p-rho_g;
-% % d_p=103e-6;
-% % pi2=k_g./(2*c_p.*my_g);
-% 
-% 
-% s1=1-(1+beta_s1(3).*pi8.^beta_s1(5)).^-1;
-% s2=1-exp(-beta_s2(3).*pi8);
-% s3=tanh(beta_s3(3).*pi8);
-% 
-% Nu_max1=beta_s1(1).*pi7./...
-%     (1+pi2.*s1.*...
-%     (1+0.28.*pi7.^2.*sqrt(pi4).*pi5.*pi6));
-% 
-% Nu_max2=beta_s2(1).*pi7./...
-%     (1+pi2.*s2.*...
-%     (1+0.28.*pi7.^2.*sqrt(pi4).*pi5.*pi6));
-% 
-% Nu_max3=beta_s3(1).*pi7./...
-%     (1+pi2.*s3.*...
-%     (1+0.28.*pi7.^2.*sqrt(pi4).*pi5.*pi6));
-% 
-% 
-% Nu_rel1=Nu_max1./Nu_max1(end);
-% Nu_rel2=Nu_max2./Nu_max2(end);
-% Nu_rel3=Nu_max3./Nu_max3(end);
-% 
-% 
-% %Molerus / Wirth p. 17
-% C=0.85;
-% u_l=0.3e-2;
-% f_L=1;
-% M=4.25e-3;
-% 
-% Nu_relMW=C.*u_l./(f_L.*d_t)+1;
-% 
-% 
-% % Grewal / Saxena 1981, p. 113
-% d_t127=12.7e-3;
-% Nu_wpmax=0.9.*(Ar.*d_t127./d_t).^0.21.*(c_p./c_g).^(45.5.*Ar.^-0.7);
-% Nu_relGW=Nu_wpmax./Nu_wpmax(end-1);
-% 
-% 
-% 
-% %Plot
-% fig=figure(400);
-% clf(fig);
-% ax=gca();
-% hold(ax,'on');
-% 
-% plot(ax,d_t.*10^3,[Nu_rel1;Nu_rel2;Nu_rel3]);
-% plot(ax,d_t.*10^3,Nu_relMW,'Color','k','LineStyle','--');
-% plot(ax,d_t.*10^3,Nu_relGW,'Color','k','LineStyle',':');
-% 
-% hold(ax,'off');
-% 
-% ax.YLim=[1,5];
-% 
-% legend(ax,[compose('s_%d',1:3),...
-%     {'Molerus&Wirth','Grewal&Saxena'}],'Location','best');
-% 
-% xlabel(ax,'Tube diameter (mm)');
-% ylabel(ax,'Nu_{max,pc} / Nu_{max,pc}(d_t\rightarrow\infty)');
-% 
-% fig.Units='centimeters';
-% fig.Position=[10,5,17,8.5];
-% 
-% % exportgraphics(fig,['Figures',filesep,'Figure3.tiff'],'Resolution',600);
+
 

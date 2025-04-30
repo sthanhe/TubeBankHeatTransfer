@@ -153,9 +153,9 @@ MW=@(i,cpfx) FluBed.molerus(sec.w(i),sec.T_bed(i),...
     sec.p_bed(i),sec.d_p(i),sec.rho_p(i),sec.phi_s(i),...
     sec.eps_mf(i),cpfx);
 
-extended=@(i,cpfx) FluBed.molExt(sec.w(i),sec.T_bed(i),...
-    sec.p_bed(i),sec.d_p(i),sec.rho_p(i),sec.phi_s(i),...
-    sec.eps_mf(i),cpfx,sec.d_t(i),sec.p_h(i),sec.w_p(i));
+% extended=@(i,cpfx) FluBed.molExt(sec.w(i),sec.T_bed(i),...
+%     sec.p_bed(i),sec.d_p(i),sec.rho_p(i),sec.phi_s(i),...
+%     sec.eps_mf(i),cpfx,sec.d_t(i),sec.p_h(i),sec.w_p(i));
 
 
 %Calculate Nu and HTCs for each material
@@ -178,11 +178,11 @@ for i=1:length(mat)
 
 
     %Extended model
-    [h,Nu]=extended(idx,cpfx{i});
-
-    sec.h_mixExt(idx)=h.total;
-    sec.Nu_mixExt(idx)=Nu.total;
-    sec.Nu_cfExt(idx)=Nu.cf;
+    % [h,Nu]=extended(idx,cpfx{i});
+    % 
+    % sec.h_mixExt(idx)=h.total;
+    % sec.Nu_mixExt(idx)=Nu.total;
+    % sec.Nu_cfExt(idx)=Nu.cf;
 end
 
 
@@ -283,7 +283,7 @@ end
 %Make plots
 pinames=compose('\\pi_{%d}',1:size(pis,2));
 figidx=810;
-for i=authors(end)'
+for i=authors'
     %Get covariance plot
     switch i{1}
         case 'Eder9'
