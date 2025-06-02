@@ -1,21 +1,18 @@
 %% Retrieve Boundary and Initial Conditions for Dynamic Model
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Part of the paper:
+% Part of the paper:
 %
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Chemical Engineering Research and Design 2025
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+% 
+% Identical to the file of the same name in:
 %
-%All data, along with methodology reports and supplementary documentation, 
-%is published in the data repository:
-%https://doi.org/10.5281/zenodo.7924693
-%
-%All required files for this function can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% S. Thanheiser, Particle Dispersion Model Software. (Feb. 07, 2025). 
+% Zenodo. doi: 10.5281/zenodo.14833128.
 %
 %
 %

@@ -1,52 +1,54 @@
-%% Dimensional Analysis
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%% Dimensional analysis
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Part of the paper:
+% Part of the paper:
 %
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Chemical Engineering Science 2024
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
 %
-%All data, along with methodology reports and supplementary documentation, 
-%is published in the data repository:
-%https://doi.org/10.5281/zenodo.7924693
+% All data, along with methodology reports and supplementary documentation, 
+% is published in the data repository:
+% https://doi.org/10.5281/zenodo.15576311
 %
-%All required files for this script can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% All required files for this script can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository
 %
 %
 %
-%This script sets up the dimensional set shown in the paper.
+% This script creates the dimensional set shown in the main paper.
 %
+%
+%Requires all auxiliary classes and functions on the MATLAB path
 %
 %Required products, version 24.1:
 %   - MATLAB
-%Necessary files, classes, functions, and scripts:
+%Necessary classes, functions, files, and scripts:
 %   - None
 
 
 %% Influencing factors
-%Original influencing factors from Molerus
-h=struct('name','h','unit','W/m²K');
-c_g=struct('name','c_g','unit','J/kgK');
-c_p=struct('name','c_p','unit','J/kgK');
-rho_g=struct('name','rho_g','unit','kg/m³');
-rho_p_rho_g=struct('name','rho_p_rho_g','unit','kg/m³');
-my_g=struct('name','my_g','unit','Pas');
-k_g=struct('name','k_g','unit','W/mK');
-w_e=struct('name','w_e','unit','m/s');
-w_mf=struct('name','w_mf','unit','m/s');
-eps_mf=struct('name','eps_mf','unit','');   %Actually: 1-eps_mf
-g=struct('name','g','unit','m/s²');
+%Original influencing factors from Molerus and Wirth
+h=struct('name','h','unit','W/m²K');                        %Heat transfer coefficient
+c_g=struct('name','c_g','unit','J/kgK');                    %Fluidization gas isobaric specific heat capacity
+c_p=struct('name','c_p','unit','J/kgK');                    %Particle isobaric specific heat capacity
+rho_g=struct('name','rho_g','unit','kg/m³');                %Fluidization gas density
+rho_p_rho_g=struct('name','rho_p_rho_g','unit','kg/m³');    %Difference between particle and fluidization gas density
+my_g=struct('name','my_g','unit','Pas');                    %Fluidization gas dynamic viscosity
+k_g=struct('name','k_g','unit','W/mK');                     %Fluidization gas thermal conductivity
+w_e=struct('name','w_e','unit','m/s');                      %Excess fluidization velocity
+w_mf=struct('name','w_mf','unit','m/s');                    %Minimum fluidization velocity
+eps_mf=struct('name','eps_mf','unit','');                   %Minimum fluidization bed voidage (actually: 1-eps_mf)
+g=struct('name','g','unit','m/s²');                         %Gravitational acceleration
 
 
 %Own (added) influencing factors
-d_t=struct('name','d_t','unit','m');
-p_h=struct('name','p_h','unit','m');
-w_p=struct('name','w_p','unit','m/s');
+d_t=struct('name','d_t','unit','m');    %Tube diameter
+p_h=struct('name','p_h','unit','m');    %Horizontal pitch
+w_p=struct('name','w_p','unit','m/s');  %Mean horizontal particle velocity
 
 
 %% New dimensional analysis with all new factors

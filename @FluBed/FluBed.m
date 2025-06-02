@@ -1,22 +1,27 @@
 %% Functions for Fluidized Beds
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Part of the paper:
-%
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Applied Thermal Energy 2024
-%
-%All required files for this class can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% Modified from:
+% Stefan Thanheiser, "Particle Dispersion Model Software”. Zenodo, Feb. 
+% 07, 2025. doi: 10.5281/zenodo.14833128.
 %
 %
+% Part of the paper:
 %
-%This class contains several functions for the calculation of properties in
-%a fluidized bed. References are given in the respective functions.
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All required files for this class can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository here: https://doi.org/10.5281/zenodo.15576311
+%
+%
+%
+% This class contains several functions for the calculation of properties 
+% in a fluidized bed. References are given in the respective functions.
 %
 %
 %Requires all files packaged in the class folder and on the MATLAB path
@@ -24,23 +29,26 @@
 %Required products, version 24.1:
 %   - MATLAB
 %Additional classes:
-%   - DryAir
-%   - implExp
+%   - @DryAir
+%   - @implExp
 
 
 classdef FluBed
     %All parameters and results in SI base units
 
+
+    %% Constants
     properties(Constant)
         g=9.81; %Gravitational acceleration, m/s²
     end
     
     
+    %% Fluidization velocities
     methods(Static)
         function [wmf,Re]=wmf(d_p,rho_p,p,T)
             %Minimum fluidization velocity
             %Approximation to the Ergun equation by assuming / estimating
-            %specific particle sphericity (phi_s) and porosity at minimum
+            %specific particle sphericity (phi_s) and voidage at minimum
             %fluidization (eps_mf)
             
             persistent C1 C2
@@ -92,16 +100,21 @@ classdef FluBed
             wmf=Re_mf.*DryAir.eta(T)./(d_p.*DryAir.rho(p,T));
             wmf=reshape(wmf,sz);
         end
+    end
         
-        
+
+    %% Bed pressure, levels, and voidage
+    methods(Static)
         function eps=eps(deltaP,deltaH,rho_p)
-            %Bed porosity when both pressure taps at a vertical distance of
+            %Bed voidage when both pressure taps at a vertical distance of
             %deltaH are in the fluidized bed
             eps=1-deltaP./(rho_p.*FluBed.g.*deltaH);
         end
         
         
-        function [eps,d_b]=porosity(w0,eps_mf,pitch,d_p,rho_p,p,T,d_H,z)
+        function [eps,d_b]=voidage(w0,eps_mf,pitch,d_p,rho_p,p,T,d_H,z)
+            %Estimation of bed voidage
+            
             %Floor area based on hydraulic diameter d_H=4*l*w/(l+w)
             d_H(d_H>1.2)=1.2;   %limited to 1.2 m according to Grace, p. 141
             A=d_H.^2*pi/4;  
@@ -136,9 +149,9 @@ classdef FluBed
             delta=(w0-wmf)./(w_b+wmf-c);
             
             
-            %Porosity
-            eps_b=1;        %Porosity in bubble phase. Assumption that bubble phase is particle-free
-            eps_e=eps_mf;   %Porosity in emulsion phase. Assumption that porosity in emulsion is about equal to porosity at minimum fluidization
+            %voidage
+            eps_b=1;        %voidage in bubble phase. Assumption that bubble phase is particle-free
+            eps_e=eps_mf;   %voidage in emulsion phase. Assumption that voidage in emulsion is about equal to voidage at minimum fluidization
             eps=delta.*eps_b+(1-delta).*eps_e;
         end
         
@@ -154,12 +167,15 @@ classdef FluBed
             %Pressure drop across a fluidized bed of height deltaH
             deltaP=rho_p.*FluBed.g.*deltaH.*(1-eps);
         end
+    end
 
-
+    
+    %% Particle sphericity
+    methods(Static)
         function [phi_s,C1,C2]=phi_s(wmf,d_p,rho_p,eps_mf,p,T)
             %Calculation of effective sphericity phi_s based on the
             %measurements of minimum fluidization velocity wmf and
-            %porosity eps_mf. All values at minimum fluidization conditions
+            %voidage eps_mf. All values at minimum fluidization conditions
 
             phi_s=fzero(@(phi) wmfErgun(d_p,rho_p,phi,eps_mf,p,T)-wmf,[0.1,0.9]);
 
@@ -171,7 +187,7 @@ classdef FluBed
 
 
         function phi_s=eps2phi(eps_mf)
-            %Calculates sphericity phi_s from the bed porosity at minimum
+            %Calculates sphericity phi_s from the bed voidage at minimum
             %fluidization conditions eps_mf
             %Based on: 
             %Wen, C.Y. and Yu, Y.H. (1966), A generalized method for 
@@ -181,8 +197,11 @@ classdef FluBed
             phi_s=sqrt((1-eps_mf)./(11*eps_mf.^3));
 
         end
+    end
 
 
+    %% Particle dispersion
+    methods(Static)
         function D=D(w,w_p,d_p,rho_p,p,T)
             %Particle dispersion coefficient
             persistent c eps2 eps3 epsAr
@@ -209,9 +228,14 @@ classdef FluBed
                         Ar(idx).^epsAr;
             end
         end
+    end
 
 
-        function [h,Nu]=molerus(w,T,p,d_p,rho_p,phi_s,eps_mf,c_pfx)
+    %% Heat transfer
+    methods(Static)
+        function [h,Nu]=molWirth(w,T,p,d_p,rho_p,phi_s,eps_mf,c_pfx)
+            %Molerus and Wirth
+
             persistent G1 G2 P1 P2 P1ast P2ast
             if isempty(G1)
                 G1=0.05;
@@ -220,14 +244,13 @@ classdef FluBed
                 P2=0.19;
                 P1ast=33.3;
                 P2ast=0.125;
-                % P1ast=P1;
-                % P2ast=P2;
             end
 
 
             %Implicit expansion
             sz=implExp.size(w,T,p,d_p,rho_p,phi_s,eps_mf);
-            [w,T,p,d_p,rho_p,phi_s,eps_mf]=implExp.normalize(sz,w,T,p,d_p,rho_p,phi_s,eps_mf);
+            [w,T,p,d_p,rho_p,phi_s,eps_mf]=implExp.normalize(sz,...
+                w,T,p,d_p,rho_p,phi_s,eps_mf);
 
             
             %Gas and particle properties
@@ -239,7 +262,6 @@ classdef FluBed
 
 
             %Fluidization velocities
-            % w_mf=FluBed.wmf(d_p,rho_p,p,T);     %Minimum
             w_mf=FluBed.wmfErgun(d_p,rho_p,phi_s,eps_mf,p,T);   %Minimum
             w_e=w-w_mf;                                         %Excess
             w_e(w_e<0)=NaN;                                     %Avoid complex results
@@ -322,27 +344,29 @@ classdef FluBed
         end
 
 
-        function [h,Nu]=molExt(w,T,p,d_p,rho_p,phi_s,eps_mf,c_pfx,...
+        function [h,Nu]=extended(w,T,p,d_p,rho_p,phi_s,eps_mf,c_pfx,...
                 d_t,p_h,w_p)
-            %Molerus' heat transfer correlation, extended (mixed regime
-            %only)
-            persistent G1 G2 P1 P2 P3 P4 C1 C2 C3 C4
+            %Extended model (mixed regime only)
+
+            persistent G1 G2 P1 P3 P4 P5 C1 C2 C3 %P6
             if isempty(G1)
+                %Gas convection constants
                 G1=0.165;
                 G2=0.05;
 
                 
+                %Particle convection constants (s2)
                 P1=0.0690771105844349;
-                P2=18.9085028208424;
+                P3=18.9085028208424;
 
-                P3=6.45824254376922e-05;
-                P4=1.15226744565364;
+                P4=6.45824254376922e-05;
+                P5=1.15226744565364;
 
-
-                C1=0.0124277981252216;
-                C2=0.242901965640370;
-                C3=1.63634185340022;
-                C4=0.616116450106231;
+                
+                %Cross-flow constants
+                C1=0.0369099339566786;
+                C2=2.21729032264777;
+                C3=0.655360558124553;
             end
 
 
@@ -368,21 +392,20 @@ classdef FluBed
 
 
             %Particle convection
+            s=1-exp(-P4.*pi(8,:));  %s2
             t=1+0.28.*pi(7,:).^2.*sqrt(pi(4,:)).*pi(5,:).*pi(6,:);
-            s=1-exp(-P3.*pi(8,:));
             Nu_pcMax=P1.*pi(7,:)./(1+pi(2,:).*t.*s);
 
-            pfx=(1-pi(9,:)).^P4;
-            d_pc=(1+P2.*(pi(6,:)./pi(5,:)).^(1/3)./pi(5,:)./pfx).^-1;
+            pfx=(1-pi(9,:)).^P5;
+            d_pc=(1+P3.*(pi(6,:)./pi(5,:)).^(1/3)./pi(5,:)./pfx).^-1;
             Nu_pc=Nu_pcMax.*d_pc;
 
 
             %Cross-flow
-            Nu_cf=C1.*pi(7,:)./(1+C2.*(pi(6,:)./pi(10,:)).^(1/3)./pi(10,:).*t.*s);
+            d_cf=1+pi(5,:).^C2.*pi(10,:).^C3.*(1-pi(9,:)).^(C2*P5*3/4);
 
-            d_cf=1-tanh((pi(5,:)./pi(6,:)).^C3.*(pi(5,:)./pi(10,:)).^C4.*...
-                (1-pi(9,:)).^(C3+C4));
-            Nu_cf=Nu_cf.*d_cf;
+            Nu_cf=C1.*pi(7,:)./...
+                (1+(pi(6,:)./pi(10,:)).^(1/3)./pi(10,:).*t.*s.*d_cf);
             Nu_cf(pi(10,:)==0)=0;
 
 
@@ -402,18 +425,28 @@ classdef FluBed
             h=struct('total',r(Nu_mix.*f),...
                     'gc',r(Nu_gc.*f),'pc',r(Nu_pc.*f),'cf',r(Nu_cf.*f));
         end
+    end
 
 
+    %% Auxiliary methods
+    methods(Static)
         function Ar=Ar(d_p,rho_p,p,T_A)
             %Archimedes number, assuming dry air as fluidizing gas
             rho_g=DryAir.rho(p,T_A);
-
             Ar=rho_g.*d_p.^3.*(rho_p-rho_g).*FluBed.g./DryAir.eta(T_A).^2;
+        end
+
+
+        function Re=Re(d_p,w,p,T)
+            %Reynolds number with respect to particle diameter
+            Re=d_p.*w./(DryAir.ny(p,T));
         end
 
 
         function [pis,k_g,l_lam]=piFactors(w,T,p,d_p,rho_p,phi_s,eps_mf,...
                 c_p,d_t,p_h,w_p)
+            %Pi-factors of extended heat transfer model
+
             %Gas and particle properties
             k_g=DryAir.lambda(T);
             my_g=DryAir.eta(T);
@@ -441,18 +474,10 @@ classdef FluBed
             pis(:,9)=d_t./p_h;
             pis(:,10)=(rho_e.*c_p./(k_g.*FluBed.g)).^(1/3).*w_p;
 
+
             %Limit pi9
             pis(pis(:,9)<0 | 1<pis(:,9),9)=NaN;
             pis(isinf(p_h),9)=0;
-        end
-    end
-    
-    
-    
-    methods(Static, Access=protected)
-        function Re=Re(d_p,w,p,T)
-            %Reynolds number with respect to particle diameter
-            Re=d_p.*w./(DryAir.ny(p,T));
         end
     end
 end

@@ -1,4 +1,49 @@
+%% Covariance plot
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%
+% Part of the paper:
+%
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All data, along with methodology reports and supplementary documentation, 
+% is published in the data repository:
+% https://doi.org/10.5281/zenodo.15576311
+%
+% All required files for this script can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository
+%
+%
+%
+% This function creates a plot to illustrate the covariance between
+% variables.
+%
+%
+%Requires all auxiliary classes and functions on the MATLAB path
+%
+%Required products, version 24.1:
+%   - MATLAB
+%Necessary classes, functions, files, and scripts:
+%   - None
+
+
 function [fig,t]=covplot(X,labels,figidx)
+    % Inputs:
+    % X: variable matrix, each column is a variable, double
+    % labels: variable names, use empty array to use default values, cell
+    %           array of character vectors
+    % figidx: index of figure window, double
+    % 
+    % 
+    % Outputs:
+    % fig: figure handle
+    % t: tile handle
+
+
     %Create default labels if they are missing
     if isempty(labels)
         labels=compose('X%d',1:size(X,2));
@@ -54,7 +99,7 @@ function [fig,t]=covplot(X,labels,figidx)
             x=arrayfun(@(i) mean(X(bin==i,c)),1:length(N));
         
 
-            %Mean-y values of each bin + standard deviation
+            %Mean y-values of each bin + standard deviation
             ymean=arrayfun(@(i) mean(X(bin==i,r)),1:length(N));
             ystd=arrayfun(@(i) std(X(bin==i,r)),1:length(N));
 
@@ -93,3 +138,7 @@ function [fig,t]=covplot(X,labels,figidx)
 
     
 end
+
+
+
+

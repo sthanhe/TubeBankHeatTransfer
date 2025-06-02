@@ -1,44 +1,45 @@
 %% Property functions of dry air at ambient pressure
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Modified from:
-%Stefan Thanheiser, "sthanhe/HeatTransfer: Round 3 Release”. Zenodo, Jan. 
-%22, 2022. doi: 10.5281/zenodo.5911319.
-%
-%
-%Part of the paper:
-%
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Applied Thermal Energy 2024
-%
-%All required files for this class can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% Modified from:
+% Stefan Thanheiser, "Particle Dispersion Model Software”. Zenodo, Feb. 
+% 07, 2025. doi: 10.5281/zenodo.14833128.
 %
 %
+% Part of the paper:
 %
-%This class describes the thermo-physical properties of dry air as an ideal
-%gas according to:
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
 %
-%Span, R. Properties of Dry Air. In VDI Heat Atlas, 2nd ed.; Stephan, P., 
-%Kabelac, S., et al., Eds.; Springer: Berlin Heidelberg, Germany, 2010; 
-%pp. 172–191. https://doi.org/10.1007/978-3-540-77877-6_11
+% All required files for this class can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository here: https://doi.org/10.5281/zenodo.15576311
+%
+%
+%
+% This class describes the thermo-physical properties of dry air as an ideal
+% gas according to:
+%
+% Span, R. Properties of Dry Air. In VDI Heat Atlas, 2nd ed.; Stephan, P., 
+% Kabelac, S., et al., Eds.; Springer: Berlin Heidelberg, Germany, 2010; 
+% pp. 172–191. https://doi.org/10.1007/978-3-540-77877-6_11
 %
 %
 %Requires all files packaged in the class folder and on the MATLAB path
 %
-%Required products:
-%   - MATLAB, version 9.14
+%Required products, version 24.1:
+%   - MATLAB
 %Data files:
 %   - dryAir.xls
-%   - dryAirTable.mat
+%   - dryAirTable.mat --> can be created with the createConstants function
 
 
 classdef DryAir 
     %All parameters and results in SI base units
+
     
     %% Constants
     properties(Constant)
@@ -57,11 +58,11 @@ classdef DryAir
         
         function h=h(T)
             %Specific enthalpy
-            % persistent tab
-            % if isempty(tab)
+            persistent tab
+            if isempty(tab)
                 tabStruct=coder.load('@DryAir\dryAirTable.mat','tab');
                 tab=tabStruct.tab;
-            % end
+            end
             
             h=interp1(tab.T,tab.h,T);
         end
@@ -147,11 +148,11 @@ classdef DryAir
         
         function eta=eta(T) %#codegen
             %Dynamic viscosity
-            % persistent tab
-            % if isempty(tab)
+            persistent tab
+            if isempty(tab)
                 tabStruct=coder.load('@DryAir\dryAirTable.mat','tab');
                 tab=tabStruct.tab;
-            % end
+            end
             
             eta=interp1(tab.T,tab.eta,T);
         end
@@ -193,11 +194,11 @@ classdef DryAir
         function T=T_h(h)
             %Backwards-equation for temperature as function of specific
             %enthalpy
-            % persistent tab
-            % if isempty(tab)
+            persistent tab
+            if isempty(tab)
                 tabStruct=coder.load('@DryAir\dryAirTable.mat','tab');
                 tab=tabStruct.tab;
-            % end
+            end
             
             T=interp1(tab.h,tab.T,h);
         end

@@ -1,21 +1,18 @@
 %% Dynamic Model Post Load Function
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Part of the paper:
+% Part of the paper:
 %
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Chemical Engineering Research and Design 2025
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+% 
+% Slight adaptation of the file of the same name in:
 %
-%All data, along with methodology reports and supplementary documentation, 
-%is published in the data repository:
-%https://doi.org/10.5281/zenodo.7924693
-%
-%All required files for this script can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% S. Thanheiser, Particle Dispersion Model Software. (Feb. 07, 2025). 
+% Zenodo. doi: 10.5281/zenodo.14833128.
 %
 %
 %
@@ -49,36 +46,39 @@ baffleCorr=ones(1,3);   %Baffle correction factors
 
 %% Initial set of boundary and inital conditions
 %Set up table
-names={'p0','Tleft','Tcenter','Tright','epsLeft','epsCenter','epsRight','mDotS','air1','air2','air3','air4','AC1set','AC2set'};
-flow=table('Size',[1,length(names)],'VariableTypes',[repmat({'double'},1,length(names))]);
-flow.Properties.VariableNames=names;
+names={'p0','Tleft','Tcenter','Tright','epsLeft',...
+    'epsCenter','epsRight','mDotS','air1','air2',...
+    'air3','air4','AC1set','AC2set'};
+init=table('Size',[1,length(names)],...
+    'VariableTypes',[repmat({'double'},1,length(names))]);
+init.Properties.VariableNames=names;
 clear('names');
 
 
 %Take values directly from a measurement point
-flow.p0=101322.321749582;
-flow.Tleft=321.622691993331;
-flow.Tcenter=319.331017705775;
-flow.Tright=330.764596384106;
-flow.epsLeft=0.467551270924290;
-flow.epsCenter=0.470101396127068;
-flow.epsRight=0.472651521329844;
-flow.mDotS=4;
-flow.air1=0.0141454434627567;
-flow.air2=0.0425907793606724;
-flow.air3=0.0370863059211219;
-flow.air4=0.0121968546724413;
-flow.AC1set=1;
-flow.AC2set=1;
+init.p0=101322.321749582;
+init.Tleft=321.622691993331;
+init.Tcenter=319.331017705775;
+init.Tright=330.764596384106;
+init.epsLeft=0.467551270924290;
+init.epsCenter=0.470101396127068;
+init.epsRight=0.472651521329844;
+init.mDotS=4;
+init.air1=0.0141454434627567;
+init.air2=0.0425907793606724;
+init.air3=0.0370863059211219;
+init.air4=0.0121968546724413;
+init.AC1set=1;
+init.AC2set=1;
 
 
 %Get boundary and initial conditions
-[bc,Phi,mAC,HAC,mAB]=getBIC(flow(1,:),direction);
+[bc,Phi,mAC,HAC,mAB]=getBIC(init(1,:),direction);
 
 
 %Other boundary and initial conditions
-p0=flow.p0(1);  %Ambient pressure
-Phigate=hGate./href.*rho_p.*(1-flow.epsRight(1))+p0./(FluBed.g.*href);  %Weir boundary condition
+p0=init.p0(1);  %Ambient pressure
+Phigate=hGate./href.*rho_p.*(1-init.epsRight(1))+p0./(FluBed.g.*href);  %Weir boundary condition
 Y0=0.6*ones(1,nACs);    %PID I-value
 
 
@@ -89,7 +89,7 @@ statCond=1e-4;      %Condition for stationary status as a value of PhiDot
 
 
 %% Static simulation parameters
-mDotSstatic=getMdotSstatic(flow.mDotS,direction);
+mDotSstatic=getMdotSstatic(init.mDotS,direction);
 isStatic=false;
 
 YMan=[1,1];

@@ -1,40 +1,50 @@
 %% Calculate Basic Properties
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Part of the paper:
+% Part of the paper:
 %
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Chemical Engineering Science 2024
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
 %
-%All data, along with methodology reports and supplementary documentation, 
-%is published in the data repository:
-%https://doi.org/10.5281/zenodo.7924693
+% All data, along with methodology reports and supplementary documentation, 
+% is published in the data repository:
+% https://doi.org/10.5281/zenodo.15576311
 %
-%All required files for this function can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% All required files for this script can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository
 %
 %
 %
-%This function calculates the basic properties of the fluidized bed system
-%needed for the subsequent analysis of measurements
+% This function calculates the basic properties of the fluidized bed system
+% needed for the subsequent analysis of measurements.
 %
 %
 %Requires all auxiliary classes and functions on the MATLAB path
 %
 %Required products, version 24.1:
 %   - MATLAB
+%   - Statistics and Machine Learning Toolbox
 %Necessary files, classes, functions, and scripts:
 %   - @DryAir
 %   - @FluBed
 %   - @Orifice
 %   - @implExp
+%   - h2FG.mat --> created by the script "prepFG" 
 
 
 function main=getProp(tab,c,htcNames,chambers)
+    % Inputs:
+    % tab: raw data measurements, table
+    % c: constants of the test rig (see function "getConstants"), struct
+    % htcNames: variable names of the output table
+    % chambers: indices of chambers to include (between 1 and 6; indices 
+    % are identical to the bed height indices), double
+
+
     %% Air flows
     nOrif=8;    %Number of orifice plates
     Onames=compose('O%d',1:nOrif);
@@ -205,7 +215,7 @@ function main=getProp(tab,c,htcNames,chambers)
 
 
     %Particle velocity = f(eps_mf)
-    flow.w_p=flow.mDot_p./(c.rho_p.*(1-c.eps_mf).*c.l.*c.hFlow);
+    flow.w_p=flow.mDot_p./(c.rho_p.*(1-c.eps_mf).*c.l.*c.hFlow.*c.psi);
 
 
     %% Heat transfer

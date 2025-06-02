@@ -1,14 +1,68 @@
+%% Prepare analysis of primary data
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%
+% Part of the paper:
+%
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All data, along with methodology reports and supplementary documentation, 
+% is published in the data repository:
+% https://doi.org/10.5281/zenodo.15576311
+%
+% All required files for this script can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository
+%
+%
+%
+% This script conducts a basic analysis of the collected secondary data and
+% saves the results for the main analysis conducted by the script "calcPC".
+% It also creates Figures published in the Methodology Report in the data
+% repository.
+%
+%
+%Requires all auxiliary classes and functions on the MATLAB path
+%
+%Required products, version 24.1:
+%   - MATLAB
+%   - Curve Fitting Toolbox
+%Necessary classes, functions, files, and scripts:
+%   - @Al2O3
+%   - @DryAir
+%   - @FluBed
+%   - @SLglass
+%   - @SiO2
+%   - @implExp
+%   - covplot.m
+
+
 %% Set data locations
-dirData='Data';         %Path to directory containing the data
-dirFigures='Figures';   %Path to directory where figures should be stored
-dirTabs='Tables';       %Path to directory where tables should be stored
-dirEder='Eder';         %Path to directory where Eder .csv files are stored (in dirData)
-fname='secData.csv';    %Name of secondary data file (in dirData)
+dirData='Data';                     %Data storage folder
+dirEder=[dirData,filesep,'Eder'];   %Storage folder of data from Eder
+fname='secData.csv';                %Secondary data file
+
+dirFigs=['Figures',filesep,'SecData'];     %Regular figure storage folder
+dirUni=[dirFigs,filesep,'Univariate'];      %Univariate plots storage folder
+dirBi=[dirFigs,filesep,'Bivariate'];        %Bivariate plots storage folder
+
+dirTabs='Tables';   %Table storage folder
 
 
-%% Make figure and table folders if they do not exist
-if ~isfolder(dirFigures)
-    mkdir(dirFigures);
+%% Make folders if they do not exist
+if ~isfolder(dirFigs)
+    mkdir(dirFigs);
+end
+
+if ~isfolder(dirUni)
+    mkdir(dirUni);
+end
+
+if ~isfolder(dirBi)
+    mkdir(dirBi);
 end
 
 if ~isfolder(dirTabs)
@@ -18,7 +72,7 @@ end
 
 %% Eder: calculate means of stationary states
 %Get file names
-foldEder=[dirData,filesep,dirEder];
+foldEder=dirEder;
 
 files=dir(foldEder);
 files=files(endsWith({files.name},'.csv'));
@@ -50,7 +104,7 @@ eder.mDot_p=round(eder.mDot_p.*60^2)./60^2;
 
 
 %% Eder: mean bed temperatures
-%Set up table for all record particle mass flows
+%Set up table for all recorded particle mass flows
 mDot_p=unique(eder.mDot_p);
 varnames={'mDot_p','n','T_bed'};
 ederTempsAll=table('Size',[numel(mDot_p),length(varnames)],...
@@ -111,7 +165,7 @@ end
 
 %% Calculate missing variables in secondary data
 %Particle sphericity phi_s
-idx=strcmp(sec.Author,'Kim (2013)') | strcmp(sec.Author,'Kim (2003)');
+idx=strcmp(sec.Author,'Kim (2003)') | strcmp(sec.Author,'Kim (2013)');
 sec.phi_s(idx)=FluBed.eps2phi(sec.eps_mf(idx));
 
 
@@ -147,15 +201,11 @@ sec(islam,:)=[];
 sec(islam,:)=[];
 
 
-%% Calculated Nusselt numbers and HTCs (original and extended model)
-%Auxiliary function handles
-MW=@(i,cpfx) FluBed.molerus(sec.w(i),sec.T_bed(i),...
+%% Calculated Nusselt numbers and HTCs (original model)
+%Auxiliary function handle
+MW=@(i,cpfx) FluBed.molWirth(sec.w(i),sec.T_bed(i),...
     sec.p_bed(i),sec.d_p(i),sec.rho_p(i),sec.phi_s(i),...
     sec.eps_mf(i),cpfx);
-
-% extended=@(i,cpfx) FluBed.molExt(sec.w(i),sec.T_bed(i),...
-%     sec.p_bed(i),sec.d_p(i),sec.rho_p(i),sec.phi_s(i),...
-%     sec.eps_mf(i),cpfx,sec.d_t(i),sec.p_h(i),sec.w_p(i));
 
 
 %Calculate Nu and HTCs for each material
@@ -163,7 +213,6 @@ mat={'Silica','Soda-lime glass','Alumina'};
 cpfx={@SiO2.c_p,@SLglass.c_p,@Al2O3.c_p};
 c_p=NaN(height(sec),1);
 for i=1:length(mat)
-    %Original model
     idx=strcmp(sec.Material,mat{i});
     c_p(idx)=cpfx{i}(sec.T_bed(idx));
     [h,Nu]=MW(idx,cpfx{i});
@@ -175,14 +224,6 @@ for i=1:length(mat)
     sec.Nu_gcMW(idx)=Nu.gc;
     sec.Nu_pcMW(idx)=Nu.pcMix;
     sec.Nu_mixMW(idx)=Nu.mix;
-
-
-    %Extended model
-    % [h,Nu]=extended(idx,cpfx{i});
-    % 
-    % sec.h_mixExt(idx)=h.total;
-    % sec.Nu_mixExt(idx)=Nu.total;
-    % sec.Nu_cfExt(idx)=Nu.cf;
 end
 
 
@@ -205,47 +246,21 @@ save('secData','sec','pis');
 
 
 %% Univariate plots
-%Set directory and create it if it does not exist
-dirUni=[dirFigures,filesep,'Univariate'];
-
-if ~isfolder(dirUni)
-    mkdir(dirUni);
-end
-
-
-%Make plots
 authors=[unique(sec.Author);'Eder9'];
 figidx=801;
 for i=authors'
-    %Normalize (z-score)
+    %Get figure
     switch i{1}
         case 'Eder9'
             idx=strcmp(sec.Author,'Eder') & pis.pi10==0;
         otherwise
             idx=strcmp(sec.Author,i);
     end
-    pisNorm=normalize(pis(idx,:));
-
-
-    %Set constants to 0
-    isconst=arrayfun(@(i) ...
-        isscalar(unique(pis(idx,i))),...
-        1:size(pisNorm,2));
-    pisNorm{:,isconst}=0;
-
-
-    %Univariate plot
-    fig=figure(figidx);
-    clf(fig);
-    t=tiledlayout(fig,1,1,'Padding','tight');
-    ax=nexttile(t);
-
-    boxchart(ax,pisNorm{:,:});
+    [fig,~,ax]=uniplot(pis{idx,:},figidx);
 
 
     %Axes labels and title
     xlabel(ax,'\pi-index (-)');
-    ylabel(ax,'z-score (-)');
 
     switch i{1}
         case 'Eder9'
@@ -256,12 +271,6 @@ for i=authors'
 
 
     %Export figure for repository
-    t.Units='centimeters';
-    t.OuterPosition=[0,0,17,8.5];
-    
-    fig.Units=t.Units;
-    fig.Position(3:4)=t.OuterPosition(3:4)+0.5;
-    
     exportgraphics(fig,[dirUni,filesep,i{1},'.tiff'],...
         'Resolution',600);
 
@@ -272,19 +281,10 @@ end
 
 
 %% Bivariate plots
-%Set directory and create it if it does not exist
-dirBi=[dirFigures,filesep,'Bivariate'];
-
-if ~isfolder(dirBi)
-    mkdir(dirBi);
-end
-
-
-%Make plots
 pinames=compose('\\pi_{%d}',1:size(pis,2));
 figidx=810;
 for i=authors'
-    %Get covariance plot
+    %Get figure
     switch i{1}
         case 'Eder9'
             idx=strcmp(sec.Author,'Eder') & pis.pi10==0;
@@ -321,8 +321,14 @@ end
 [tabMin10,tabMean10,tabMax10,tabVars10]=getVars(sec,pis,dirTabs);
 
 
+% Without pi10, only mixed regime
+idx=sec.Ar<1e5 & pis.pi10==0;
+[tabMinMixed,~,tabMaxMixed,tabVarsMixed]=getVars(sec(idx,:),pis(idx,:),[]);
+
+
 %Eder, without pi10
 idx=strcmp(sec.Author,'Eder') & pis.pi10==0;
+nEderCF=nnz(strcmp(sec.Author,'Eder') & pis.pi10>0);    %Number of Eder's measurements with cross-flow
 [tabMin9,tabMean9,tabMax9,tabVars9]=getVars(sec(idx,:),pis(idx,1:9),dirTabs);
 
 
@@ -402,9 +408,11 @@ function [tabMin,tabMean,tabMax,tabVars]=getVars(sec,pis,dirTabs)
 
 
     %Write tables
-    writetable(tabMin,[dirTabs,filesep,'tabMin',num2str(npi),'.csv']);
-    writetable(tabMean,[dirTabs,filesep,'tabMean',num2str(npi),'.csv']);
-    writetable(tabMax,[dirTabs,filesep,'tabMax',num2str(npi),'.csv']);
+    if ~isempty(dirTabs)
+        writetable(tabMin,[dirTabs,filesep,'tabMin',num2str(npi),'.csv']);
+        writetable(tabMean,[dirTabs,filesep,'tabMean',num2str(npi),'.csv']);
+        writetable(tabMax,[dirTabs,filesep,'tabMax',num2str(npi),'.csv']);
+    end
 end
 
 

@@ -1,7 +1,55 @@
-function [mdl,beta]=getFit(X,y,fx,beta0)
-    %% Scale response and predictor variables
-    % xmean=mean(X,1,'omitmissing');
+%% Conduct regression analysis
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%
+% Part of the paper:
+%
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All data, along with methodology reports and supplementary documentation, 
+% is published in the data repository:
+% https://doi.org/10.5281/zenodo.15576311
+%
+% All required files for this script can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository
+%
+%
+%
+% This function analyses the model function of a regression analysis, 
+% scales the starting values of the regression coefficients, conducts the
+% regression analysis, removes outliers, and re-conducts the regression
+% analysis with the outliers removed. This improves stability of the
+% regression analysis.
+%
+%
+%Requires all auxiliary classes and functions on the MATLAB path
+%
+%Required products, version 24.1:
+%   - MATLAB
+%   - Statistics and Machine Learning Toolbox
+%Necessary classes, functions, files, and scripts:
+%   - None
 
+
+function [mdl,beta]=getFit(X,y,fx,beta0)
+    % Inputs:
+    % X: regressor matrix, double [m,n]
+    % y: response variable, double [m,1]
+    % fx: model function in the form fx(b,X), where b are the regression
+    %       coefficients, function handle
+    % beta0: starting values of the regression coefficients, double
+    % 
+    % 
+    % Outputs:
+    % mdl: results of the regression with scaled variables, NonLinearModel
+    % beta: resulting regression coefficients (scaled back), double
+
+
+    %% Scale response variable
     ymean=mean(y,'omitmissing');
     y=y./ymean;
 
@@ -23,27 +71,7 @@ function [mdl,beta]=getFit(X,y,fx,beta0)
     fxstr=regexprep(fxstr,[vars{2},'\(:,(\d+)\)'],'xmean(:,$1)');
 
 
-    % %Replace additive factors to variables with changed variables
-    % sums=regexp(fxstr,'\((\d+)([-+])(xmean\(:,\d+\))\)','tokens');
-    % if ~isempty(sums)
-    %     sums=vertcat(sums{:});
-    %     sums(:,1)=cellfun(@str2double,sums(:,1),'UniformOutput',false);
-    % 
-    %     idx=cellfun(@(x) textscan(x,'xmean(:,%f)'),sums(:,3));
-    %     idx=vertcat(idx{:});
-    %     for i=1:length(idx)
-    %         switch sums{i,2}
-    %             case '+'
-    %                 X(:,idx(i))=sums{i,1}+X(:,idx(i));
-    %             case '-'
-    %                 X(:,idx(i))=sums{i,1}-X(:,idx(i));
-    %         end
-    %     end
-    %     fxstr=regexprep(fxstr,'\(\d+[-+](xmean\(:,\d+\))\)','$1');
-    % end
-
-
-    %% Scale beta0
+    %% Identify multiplication and power betas
     %Basic function string properties
     l=length(fxstr);    %Length
     x=1:l;              %Position vector
@@ -75,13 +103,6 @@ function [mdl,beta]=getFit(X,y,fx,beta0)
             (levels<betaPowerLevel(i) & ...
             x<betaPowerStart(i)),...
             1,'last')+1;
-        % betaPowerStart(i)=find(...
-        %     (levels==betaPowerLevel(i) & ...
-        %     x<betaPowerStart(i) & ...
-        %     isOp) | ...
-        %     (levels<betaPowerLevel(i) & ...
-        %     x<betaPowerStart(i)),...
-        %     1,'last')+1;
 
         betaPowerLength=regexp(fxstr(x>=betaPowerEnd(i)),...
             '^(beta0\(\d+\))','tokenExtents');
@@ -180,8 +201,6 @@ function [mdl,beta]=getFit(X,y,fx,beta0)
         end
 
 
-
-
         %Ensure that beta is not followed by a division operator
         op=find(isOp & x>betaMultStart(i),1);
         if matches(fxstr(op),'/')
@@ -216,7 +235,7 @@ function [mdl,beta]=getFit(X,y,fx,beta0)
     betaMultStart=betaMultStart(1:end-1);
 
     
-    %Split function string at betas
+    %% Split function string at betas
     betaStart=[betaMultStart,betaPowerStart];
     betaEnd=[betaMultEnd,betaPowerEnd];
 
@@ -227,7 +246,13 @@ function [mdl,beta]=getFit(X,y,fx,beta0)
     fxsplit(cellfun(@isempty,fxsplit))=[];
 
 
-    %Replace scaled variables with new variables (X2) and scale beta0
+    %% Restructure function and scale beta0
+    %Check if betas are scaled more than once
+    idx=cellfun(@(x) betaIdx(x),fxsplit);
+    multiscale=arrayfun(@(i) nnz(idx==i)>1,1:length(beta0));
+
+
+    %Replace scaled variables with new variables (X2)
     X2idx=size(X,2)+1;
     X=[X,NaN(size(X,1),numel(betaStart))];
     beta0norm=beta0;
@@ -235,8 +260,17 @@ function [mdl,beta]=getFit(X,y,fx,beta0)
     scaleStr=cell(size(fxsplit));
     hasMultBeta=false(size(fxsplit));
     for i=1:length(fxsplit)
+        %Skip if beta is scaled multiple times
+        idx=betaIdx(fxsplit{i});
+        if ~isnan(idx) && multiscale(idx)
+            continue;
+        end
+
+
+        %Identify type of beta (multiplication or power)
         if startsWith(fxsplit{i},'beta0')
             %Is multiplication beta
+
 
             %Split expression
             betaSplit=regexp(fxsplit{i},...
@@ -262,7 +296,8 @@ function [mdl,beta]=getFit(X,y,fx,beta0)
                 X2str=strrep(betaSplit{3},'xmean','X');
                 X(:,X2idx)=eval(X2str);
     
-                X2mean=mean(X(:,X2idx),1,'omitmissing');
+                infinite=isinf(X(:,X2idx));
+                X2mean=mean(X(~infinite,X2idx),1,'omitmissing');
                 X(:,X2idx)=X(:,X2idx)./X2mean;
                 xmean(X2idx)=X2mean;
     
@@ -289,6 +324,7 @@ function [mdl,beta]=getFit(X,y,fx,beta0)
             % fxsplit before is multiplication beta, or 
             % fxsplit two positions before is power beta
             %and those splits are on the same level
+
 
             %Split expression
             betaSplit=regexp(fxsplit{i},...
@@ -349,115 +385,47 @@ function [mdl,beta]=getFit(X,y,fx,beta0)
     fx=eval(['@(beta0,xmean) 1/ymean.*(',[fxsplit{:}],');']);
 
 
-
-
-
-
-    % fig=figure(1);
-    % clf(fig);
-    % ax=gca();
-    % colors=ax.ColorOrder;
-    % hold(ax,'on');
-    % 
-    % plot(ax,levels,'Color',colors(1,:));
-    % xline(ax,betaStart,'Color',colors(2,:));
-    % xline(ax,betaEnd,'Color',colors(2,:),'LineStyle','--');
-
-
-
-
-
-
-
-
-
-
-    % %Split function at "+" or "-" (but not "^-" or "^(-")
-    % fxsplit=split(fxstr,regexpPattern('(?<!(\^|\^\())[-+]'));
-    % fxsplit=cleanfx(fxsplit);
-    % 
-    % 
-    % %Ensure that regressors without a beta remain unscaled
-    % xmean=mean(X,1,'omitmissing');
-    % 
-    % hasBeta0=contains(fxsplit,'beta0');
-    % hasXmean=contains(fxsplit,'xmean');
-    % 
-    % idxStr=arrayfun(@(i) regexp(fxsplit{i},'xmean\(:,(\d+)\)','tokens'),...
-    %     find(hasXmean & ~hasBeta0)','UniformOutput',false);
-    % if ~isempty(idxStr)
-    %     idxStr=[idxStr{:}];
-    %     xmean(str2double([idxStr{:}]))=1;
-    % end
-    % 
-    % 
-    % %Remove splits without a beta0
-    % fxsplit=fxsplit(hasBeta0);
-    % 
-    % 
-    % %Split again at "^(beta" or "^(-beta"
-    % c=cellfun(@(x) count(x,'beta0'),fxsplit);
-    % fxsplit2=cell(sum(c),1);
-    % counter=1;
-    % for i=1:length(fxsplit)
-    %     idx=regexp(fxsplit{i},('(\^\(|\^\(-)beta0'));
-    %     idx=[1,idx,length(fxsplit{i})]; %#ok<AGROW>
-    %     betasplit=arrayfun(@(j) extractBetween(fxsplit{i},idx(j),idx(j+1)),...
-    %         1:length(idx)-1)';
-    % 
-    %     fxsplit2(counter:counter+length(betasplit)-1)=betasplit;
-    % 
-    %     counter=counter+length(betasplit);
-    % end
-    % fxsplit2=fxsplit2(~cellfun(@isempty,fxsplit2));
-    % fxsplit2=cleanfx(fxsplit2);
-    % 
-    % 
-    % %Calculate conversion factors
-    % beta0norm=NaN(size(beta0));
-    % for i=1:length(fxsplit2)
-    %     %Find beta0 index and calculate beta0norm
-    %     idxStr=regexp(fxsplit2{i},'^beta0\((\d+)\)','tokens');
-    %     beta0norm(str2double(idxStr{1}))=eval(fxsplit2{i});
-    % end
-    % 
-    % 
-    % %beta0norm=beta0 where there is no conversion
-    % idx=isnan(beta0norm);
-    % beta0norm(idx)=beta0(idx);
-    % 
-    % 
-    % %Add ymean scale factor to function
-    % % fx=@(b,x) 1/ymean.*fx(b,x);
-    % % beta0norm(1)=beta0norm(1)/ymean;
-    % fx=eval(['@(beta0,xmean) 1/ymean.*(',fxstr,');']);
-
-
     %% Calculate fit
     %Set options
     opts=statset('fitnlm');
     opts.Display='iter';
     opts.TolFun=1e-12;
     opts.TolX=1e-12;
-    % opts.Robust='on';
     opts.MaxIter=10000;
 
 
-    %Initial model
-    % X=X./xmean;
-    mdl=fitnlm(X,y,fx,beta0norm,'Options',opts);
-    % [betanorm,R,J,CovB,MSE,ErrorModelInfo]=nlinfit(X,y,fx,beta0norm,opts);
+    %Initial regression: adapt derivative step if it is not converging
+    isconv=false;
+    while ~isconv && opts.DerivStep<10
+        try
+            mdl=fitnlm(X,y,fx,beta0norm,'Options',opts);
+
+            isconv=true;
+        catch ME
+            if strcmp(ME.identifier,'stats:nlinfit:NonFiniteFunOutput')
+                opts.DerivStep=opts.DerivStep.^(1/3);
+            else
+                rethrow(ME);
+            end
+        end
+    end
+
+
+    %Reset warning message stack for later analysis
+    lastwarn('','');
 
 
     %Remove outliers, redo fit
-    outliers=(mdl.Diagnostics.CooksDistance)>...
-        3*mean(mdl.Diagnostics.CooksDistance,'omitmissing');
-    y(outliers)=[];
-    X(outliers,:)=[];
-
-    lastwarn('','');    %Reset warning message stack for later analysis
-
-    mdl=fitnlm(X,y,fx,beta0norm,'Options',opts);
+    if isconv
+        outliers=(mdl.Diagnostics.CooksDistance)>...
+            3*mean(mdl.Diagnostics.CooksDistance,'omitmissing');
+        y(outliers)=[];
+        X(outliers,:)=[];
+    
+        mdl=fitnlm(X,y,fx,beta0norm,'Options',opts);
+    else
+        throw(ME);
+    end
 
 
     %% Rescale results
@@ -472,6 +440,7 @@ function [mdl,beta]=getFit(X,y,fx,beta0)
     %Rescale for power betas: replace beta0 with normalized results
     for i=1:length(scaleStr)
         idx=betaIdx(scaleStr{i});
+        idx=idx(1);
 
         scaleStr{i}=erase(scaleStr{i},regexpPattern('^beta0\(\d+\)[.*/]+'));
         scaleStr{i}=strrep(scaleStr{i},'beta0','betanorm');
@@ -485,6 +454,7 @@ end
 
 %% Auxiliary functions
 function splitStr=splitBetween(str,startPos,endPos)
+    %Split a string between the indicated numerical indices
     splitStr=cell(2*length(startPos)+1,1);
 
     splitStr{1}=str(1:startPos(1)-1);
@@ -524,57 +494,10 @@ end
 
 function idx=betaIdx(str)
     %Get beta index
-    idxStr=regexp(str,'^beta0\((\d+)\)','tokens');
-    idx=str2double(idxStr{1});
+    idxStr=regexp(str,'beta0\((\d+)\)','tokens');
+    idx=str2double([idxStr{:}]);
 end
 
 
-% function fxsplit=cleanfx(fxsplit)
-%     for i=1:length(fxsplit)
-%         %Remove leading operators
-%         % idx=regexp(fxsplit{i},'(^[.*/^+-\(]+)','tokenExtents');
-%         idx=regexp(fxsplit{i},'(^\W+)','tokenExtents');
-%         if ~isempty(idx)
-%             idx=idx{1};
-%             fxsplit{i}(idx(1):idx(2))=[];
-%         end
-% 
-% 
-%         %Find braces
-%         brace=zeros(size(fxsplit{i}));
-%         brace(strfind(fxsplit{i},'('))=1;
-%         brace(strfind(fxsplit{i},')'))=-1;
-% 
-% 
-%         %Last brace cannot be an open one
-%         lastOpen=find(brace==1,1,'last');
-%         lastClose=find(brace==-1,1,'last');
-%         if lastClose<lastOpen | (isempty(lastClose) && ~isempty(lastOpen))
-%             fxsplit{i}(lastOpen:end)=[];
-%             brace(lastOpen:end)=[];
-%         end
-% 
-% 
-%         %Ensure consistent bracing
-%         brace=cumsum(brace);
-%         % lastEqual=find(brace==0,1,'last');
-%         % fxsplit{i}=fxsplit{i}(1:lastEqual);
-%         firstNeg=find(brace<0,1);
-%         if ~isempty(firstNeg)
-%             fxsplit{i}=fxsplit{i}(1:firstNeg-1);
-%         end
-% 
-% 
-%         %Remove trailing operators
-%         idx=regexp(fxsplit{i},'[.*/^+-]+$');
-%         fxsplit{i}(idx:end)=[];
-%     end
-% end
 
 
-% function s=splitDelim(str,delimiter)
-%     %Split, but keep delimiters
-%     s=split(str,delimiter);
-%     s(cellfun(@isempty,s))=[];
-%     s=cellfun(@(x) [delimiter,x],s,'UniformOutput',false);
-% end

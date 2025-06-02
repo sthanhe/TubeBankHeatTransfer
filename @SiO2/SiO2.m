@@ -1,28 +1,46 @@
 %% Property functions of silicon dioxide (SiO2)
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%
+% Modified from:
+% Stefan Thanheiser, "Particle Dispersion Model Software”. Zenodo, Feb. 
+% 07, 2025. doi: 10.5281/zenodo.14833128.
 %
 %
-%This class describes the thermo-physical properties of silicon dioxide
-%(SiO2) according to:
+% Part of the paper:
 %
-%Stefan Thanheiser, dissertation at TU Wien (2023)
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All required files for this class can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository here: https://doi.org/10.5281/zenodo.15576311
+% 
+%
+%
+% This class describes the thermo-physical properties of silicon dioxide
+% (SiO2) according to:
+%
+% Stefan Thanheiser, PhD thesis at TU Wien (2025)
 %
 %
 %Requires all files packaged in the class folder and on the MATLAB path
 %
-%Required products:
-%   - MATLAB, version 9.10
-%   - Curve Fitting Toolbox, version 3.5.13
+%Required products, version 24.1:
+%   - MATLAB
+%   - Curve Fitting Toolbox
 %Necessary files, classes and functions:
 %   - createFits.m
-%   - fits.mat
+%   - fits.mat --> can be created with the createConstants function
 
 
 classdef SiO2
     %All parameters and results in SI base units
     
-    %%
+
+    %% Constants
     properties(Constant)
         M=60.0843e-3;       %Molar mass
 
@@ -60,6 +78,7 @@ classdef SiO2
     methods(Static)
         function c_p=c_p(T,phase)
             %Specific isobaric heat capacity
+
             persistent Atr Btr Ctr Dtr Etr Ftr Acr Bcr Ccr Dcr Ecr Fcr
             if isempty(Atr)
                 Atr=3.27*4.184/SiO2.M;
@@ -127,6 +146,7 @@ classdef SiO2
         function h=h(T,phase)
             %Specific enthalpy
             %h(298.15)=0
+
             persistent H alphaTri betaTri alphaCri betaCri
             if isempty(H)
                 H=-910.8568;
@@ -175,6 +195,7 @@ classdef SiO2
         
         function s=s(T)
             %Specific entropy
+
             persistent G G_beta
             if isempty(G)
                 G=-27.96962;
@@ -196,6 +217,8 @@ classdef SiO2
 
 
         function rho=rho(T,phase)
+            %Density
+
             if nargin<2
                 phase='quartz';
             end
@@ -226,6 +249,7 @@ classdef SiO2
         function T=T_h(h,phase)
             %Backwards-equation for temperature as function of specific
             %enthalpy
+
             persistent alphaQuartz betaQuartz alphaTri betaTri alphaCri betaCri hQuartzAlphaMin hQuartzAlphaMax hQuartzBetaMin hQuartzBetaMax hTriAlphaMin hTriAlphaMax hTriBetaMin hTriBetaMax hCriAlphaMin hCriAlphaMax hCriBetaMin hCriBetaMax
             if isempty(alphaQuartz)
                 %Property functions
@@ -294,6 +318,7 @@ classdef SiO2
         
         function createConstants()
             %Creates the curve fittings for lookup
+            
             clear('SiO2');
             T0=298.15;  %Zero reference point for enthalpy
             

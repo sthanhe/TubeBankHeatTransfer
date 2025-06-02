@@ -1,10 +1,57 @@
-%% Set data directories
-dirFigures=['Figures',filesep,'CFmodels'];   %Path to directory where figures should be stored
-fname='primData.mat';
+%% Analyze particle cross-flow
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%
+% Part of the paper:
+%
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All data, along with methodology reports and supplementary documentation, 
+% is published in the data repository:
+% https://doi.org/10.5281/zenodo.15576311
+%
+% All required files for this script can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository
+%
+%
+%
+% This script conducts the main analysis of the collected primary data to
+% find a suitable functional form of the cross-flow damping function 
+% d_cf(pi5). It creates all published figures and calculates the statistics
+% mentioned in both the main paper and the Methodology Report. 
+%
+%
+%Requires all auxiliary classes and functions on the MATLAB path
+%
+%Required products, version 24.1:
+%   - MATLAB
+%   - Statistics and Machine Learning Toolbox
+%Necessary classes, functions, files, and scripts:
+%   - @figaux
+%   - checkFit.m
+%   - getFit.m
+%   - primData.mat --> created by the script "prepPrim"
 
 
-if ~isfolder(dirFigures)
-    mkdir(dirFigures);
+%% Set data locations
+dirData=['Data',filesep,'Own'];             %Data storage folder
+dirFigs=['Figures',filesep,'CFmodels'];     %Figure storage folder
+dirTabs='Tables';                           %Table storage folder
+
+fname='primData.mat';   %Primary data file
+
+
+%% Make folders if they do not exist
+if ~isfolder(dirFigs)
+    mkdir(dirFigs);
+end
+
+if ~isfolder(dirTabs)
+    mkdir(dirTabs);
 end
 
 
@@ -12,223 +59,163 @@ end
 load(fname);
 
 
+%Regressor matrix X and response variable y
+X=pis{:,:};
+y=pis.pi1;
 
-% %%
-% figure(101)
-% 
-% scatter(prim.h_cf,prim.h_cf./(prim.h_eff-fit(0)));
 
+%% Function strings
+%Basic
+base='@(b,x) b().*x(:,7)./(1+';     %Start of function
+b='b().*';                          %Coefficient
 
 
+%Particle transport resistance r and turbulence function t
+r='(x(:,6)./x(:,10)).^(1/3)./x(:,10).*';
+t='(1+0.28.*x(:,7).^2.*sqrt(x(:,4)).*x(:,5).*x(:,6)).*';
 
 
-%% Model preparation
-idx=true(1,height(pis));
-% idx=pis.pi1>0;
-% idx=prim.mDot_p>1;
-% idx=pis.pi1>0 & prim.mDot_p>0.5;
+%Size functions
+s1='(1-(1+6.28756168714156e-11.*x(:,8).^2.58077440742616).^-1).*';
+s2='(1-exp(-6.45824254376922e-05.*x(:,8))).*';
+s3='tanh(5.37302742339688e-05.*x(:,8)).*';
 
-y=pis.pi1(idx);
-X=pis{idx,:};
 
+%Particle-convection coefficients P5 for different size functions
+P5s1=0.763002330862026;
+P5s2=1.15226744565364;
+P5s3=1.01505510898379;
 
-base=['@(b,x) ',...
-    'b(1).*x(:,7)./',...
-    '(1+b(2).*(x(:,6)./x(:,10)).^(1/3)./x(:,10).*',...
-    '(1+0.28.*x(:,7).^2.*sqrt(x(:,4)).*x(:,5).*x(:,6)).*'];
 
-s='(1-exp(-6.45824254376922e-05.*x(:,8)))).*';
+%Choose size function
+s=s2;
+P5=P5s2;
 
 
-fx_1start='((1+';
-fx_1end=').^-1)';
+%% Model 1
+% All pi-factors, except pi3 (only gas-convection), pi7 (constant and 
+% already included in nominator), pi8 (already included in size function),
+% and (1-pi9) instead of pi9: insensitive parameters, R²=0.82, 
+% AIC=-5.5, all p-values except those of pi5 and pi10 very high
 
-fx_2start='exp(-';
-fx_2end=')';
+fxstr=[base,r,t,s,'(1+',b,monostr([2,4,5,6,10]),...
+    '.*(1-x(:,9)).^b()));'];
+[fxstr,n]=bidx(fxstr);
+fx1=eval(fxstr);
 
-fx_3start='(1-tanh(';
-fx_3end='))';
+[mdl1,beta1]=getFit(X,y,fx1,[0.1,1e3,ones(1,n-2)]');
 
+checkFit(X,y,fx1,beta1,'1',611,false,dirFigs);
+checkFit(X,y,fx1,beta1,'1',610,true,dirFigs);
 
-opt_a1='(x(:,5)./x(:,10)).^b(3).*(1-x(:,9)).^b(3)';
-opt_a2='(x(:,5)./x(:,10)).^b(3).*(1-x(:,9)).^b(4)';
 
-opt_b2='(x(:,5)./x(:,10)).^b(3).*(x(:,5)./x(:,6)).^b(4).*(1-x(:,9)).^(b(3)+b(4))';
-opt_b3='(x(:,5)./x(:,10)).^b(3).*(x(:,5)./x(:,6)).^b(4).*(1-x(:,9)).^b(5)';
+%% Model 2
+% Like model 1, but removed b(2) and pi4: R²=0.82, AIC=-7.8, all p-values 
+% except those of pi5 and pi10 very high
 
+fxstr=[base,r,t,s,'(1+',monostr([2,5,6,10]),...
+    '.*(1-x(:,9)).^b()));'];
+[fxstr,n]=bidx(fxstr);
+fx2=eval(fxstr);
 
-beta0_1=[0.05,1,1]';
-beta0_2=[0.05,1,1,1]';
-beta0_3=[0.05,1,1,1,1]';
+[mdl2,beta2]=getFit(X,y,fx2,[0.1,ones(1,n-1)]');
 
+checkFit(X,y,fx2,beta2,'2',621,false,dirFigs);
+checkFit(X,y,fx2,beta2,'2',620,true,dirFigs);
 
-base=[base,s];
 
 
-%% Model 1a1
-fx_1a1=eval([base,fx_1start,opt_a1,fx_1end]);
+%% Model 3
+% Like model 2, but coupled exponent of pi9 to pi5 and scaled according to 
+% particle convection results: R²=0.81, AIC=-7.1, all p-values except those
+% of pi5 and pi10 very high
 
+fxstr=[base,r,t,s,'(1+',monostr([2,5,6,10]),...
+    '.*(1-x(:,9)).^(b()*',num2str(P5),'*3/4)));'];
+fxstr=bidx(fxstr);
+[fxstr,n]=couple(fxstr,[5,9]);
+fx3=eval(fxstr);
 
-[mdl_1a1,beta_1a1]=getFit(X,y,fx_1a1,beta0_1);
+[mdl3,beta3]=getFit(X,y,fx3,[0.1,ones(1,n-1)]');
 
-checkFit(X,y,fx_1a1,beta_1a1,'1a1',111,false,dirFigures);
+checkFit(X,y,fx3,beta3,'3',631,false,dirFigs);
+checkFit(X,y,fx3,beta3,'3',630,true,dirFigs);
 
 
-%% Model 1a2
-fx_1a2=eval([base,fx_1start,opt_a2,fx_1end]);
+%% Model 4
+% Like model 2, but removed pi2: R²=0.81, AIC=-7.1, all p-values except 
+% those of pi5 and pi10 very high
 
+fxstr=[base,r,t,s,'(1+',monostr([5,6,10]),...
+    '.*(1-x(:,9)).^b()));'];
+[fxstr,n]=bidx(fxstr);
+fx4=eval(fxstr);
 
-[mdl_1a2,beta_1a2]=getFit(X,y,fx_1a2,beta0_2);
+[mdl4,beta4]=getFit(X,y,fx4,[0.1,ones(1,n-1)]');
 
-checkFit(X,y,fx_1a2,beta_1a2,'1a2',112,false,dirFigures);
+checkFit(X,y,fx4,beta4,'4',641,false,dirFigs);
+checkFit(X,y,fx4,beta4,'4',640,true,dirFigs);
 
 
-%% Model 1b2
-fx_1b2=eval([base,fx_1start,opt_b2,fx_1end]);
+%% Model 5
+% Like model 2, but removed pi2 and coupled exponents of pi5 and pi9 like 
+% in model 3: R²=0.81, AIC=-9.1, p-values of b(1) and pi6 about 2%
 
+fxstr=[base,r,t,s,'(1+',monostr([5,6,10]),...
+    '.*(1-x(:,9)).^(b()*',num2str(P5),'*3/4)));'];
+fxstr=bidx(fxstr);
+[fxstr,n]=couple(fxstr,[5,9]);
+fx5=eval(fxstr);
 
-[mdl_1b2,beta_1b2]=getFit(X,y,fx_1b2,beta0_2);
+[mdl5,beta5]=getFit(X,y,fx5,[0.1,ones(1,n-1)]');
 
-checkFit(X,y,fx_1b2,beta_1b2,'1b2',122,false,dirFigures);
+checkFit(X,y,fx5,beta5,'5',651,false,dirFigs);
+checkFit(X,y,fx5,beta5,'5',650,true,dirFigs);
 
 
-%% Model 1b3
-fx_1b3=eval([base,fx_1start,opt_b3,fx_1end]);
+%% Model 6
+% Like model 5, but removed pi6: R²=0.83, AIC=-11.9, good p-values
 
+fxstr=[base,r,t,s,'(1+',monostr([5,10]),...
+    '.*(1-x(:,9)).^(b()*',num2str(P5),'*3/4)));'];
+fxstr=bidx(fxstr);
+[fxstr,n]=couple(fxstr,[5,9]);
+fx6=eval(fxstr);
 
-[mdl_1b3,beta_1b3]=getFit(X,y,fx_1b3,beta0_3);
+[mdl6,beta6]=getFit(X,y,fx6,[0.1,ones(1,n-1)]');
 
-checkFit(X,y,fx_1b3,beta_1b3,'1b3',123,false,dirFigures);
-
-
-%% Model 2a1
-fx_2a1=eval([base,fx_2start,opt_a1,fx_2end]);
-
-
-[mdl_2a1,beta_2a1]=getFit(X,y,fx_2a1,beta0_1);
-
-checkFit(X,y,fx_2a1,beta_2a1,'2a1',211,false,dirFigures);
-
-
-%% Model 2a2
-fx_2a2=eval([base,fx_2start,opt_a2,fx_2end]);
-
-
-[mdl_2a2,beta_2a2]=getFit(X,y,fx_2a2,beta0_2);
-
-checkFit(X,y,fx_2a2,beta_2a2,'2a2',212,false,dirFigures);
-
-
-%% Model 2b2
-fx_2b2=eval([base,fx_2start,opt_b2,fx_2end]);
-
-
-[mdl_2b2,beta_2b2]=getFit(X,y,fx_2b2,beta0_2);
-
-checkFit(X,y,fx_2b2,beta_2b2,'2b2',222,false,dirFigures);
-
-
-%% Model 2b3
-fx_2b3=eval([base,fx_2start,opt_b3,fx_2end]);
-
-
-[mdl_2b3,beta_2b3]=getFit(X,y,fx_2b3,beta0_3);
-
-checkFit(X,y,fx_2b3,beta_2b3,'2b3',223,false,dirFigures);
-
-
-%% Model 3a1
-fx_3a1=eval([base,fx_3start,opt_a1,fx_3end]);
-
-
-[mdl_3a1,beta_3a1]=getFit(X,y,fx_3a1,beta0_1);
-
-checkFit(X,y,fx_3a1,beta_3a1,'3a1',311,false,dirFigures);
-
-
-%% Model 3a2
-fx_3a2=eval([base,fx_3start,opt_a2,fx_3end]);
-
-
-[mdl_3a2,beta_3a2]=getFit(X,y,fx_3a2,beta0_2);
-
-checkFit(X,y,fx_3a2,beta_3a2,'3a2',312,false,dirFigures);
-
-
-%% Model 3b2
-fx_3b2=eval([base,fx_3start,opt_b2,fx_3end]);
-
-
-[mdl_3b2,beta_3b2]=getFit(X,y,fx_3b2,beta0_2);
-
-checkFit(X,y,fx_3b2,beta_3b2,'3b2',322,false,dirFigures);
-
-
-%% Model 3b3
-fx_3b3=eval([base,fx_3start,opt_b3,fx_3end]);
-
-
-[mdl_3b3,beta_3b3]=getFit(X,y,fx_3b3,beta0_3);
-
-checkFit(X,y,fx_3b3,beta_3b3,'3b3',323,false,dirFigures);
+checkFit(X,y,fx6,beta6,'6',661,false,dirFigs,5e-3);
+checkFit(X,y,fx6,beta6,'6',660,true,dirFigs,5e-3);
 
 
 %% Comparison to Molerus
 % Choose best model
-fx=fx2;
-beta_s=beta_s2;
-mdl=mdl_s2;
+fx=fx6;
+beta=beta6;
 
 
-yEst=fx3c2(beta_3c2,X);
+%Estimated cross-flow Nusselt numbers
+yEst=fx(beta,X);
 
 
-
-
-R2=mdl_3c2.Rsquared.Adjusted;
-
-
-cidx=1:4;
-names={'Parameter','H0','Estimate','p'};
-para=table('Size',[length(cidx)+1,length(names)],...
-    'VariableTypes',[{'string'},repmat({'double'},1,length(names)-1)],...
-    'VariableNames',names);
-
-
-para.Parameter=[compose('C%d',cidx),{'C3+C4'}]';
-para.Estimate(1:end-1)=beta_3c2;
-para.Estimate(end)=sum(beta_3c2(3:4));
-
-
-for i=1:height(para)-1
-    beta_null=para.Estimate;
-    beta_null(i)=para.H0(i);
-
-    [~,p]=ttest(fx3c2(beta_null,X),y);
-    para.p(i)=p;
-end
-
-
-beta_null=para.Estimate;
-beta_null(3:4)=para.H0(3:4);
-[~,para.p(end)]=ttest(fx3c2(beta_null,X),y);
-
-
-%%
-figidx=4;
+%Set up figure
+figidx=6;
 fig=figure(figidx);
 clf(fig);
-t=tiledlayout(fig,1,1,'Padding','tight');
-ax=nexttile(t);
+til=tiledlayout(fig,1,1,'Padding','tight');
+ax=nexttile(til);
 colors=ax.ColorOrder;
 hold(ax,'on');
 
 
-legItems=cell(1,2);
+%Plot data
+legItems=cell(1,2);     %Legend item container
 
 legItems{1}=scatter(ax,y(~prim.mode),yEst(~prim.mode),18,colors(1,:),'o');
 legItems{2}=scatter(ax,y(prim.mode),yEst(prim.mode),18,colors(2,:),'+');
 
+
+%Plot equivalence lines
 lim=max([ax.XLim(2),ax.YLim(2)]);
 eq=linspace(0,lim,100);
 
@@ -239,16 +226,18 @@ plot(ax,eq,eq./1.2,'Color','k','LineStyle','--');
 hold(ax,'off');
 
 
-legItems=[legItems{:}];
-txt=subsz({'P_{el} = const.','T_{surf} - T_{bed} = const.'},6);
-lgd=legend(ax,legItems,txt,'Location','southeast');
+%Set legend
+lgd=legend(ax,[legItems{:}],...
+    figaux.subsz({'P_{el} = const.','T_{surf} - T_{bed} = const.'},6),...
+    'Location','southeast');
 
 
+%Axes limits and labels
 ax.XLim=[0,lim];
 ax.YLim=[0,lim];
 
-xlabel(ax,subsz('Measured Nu_{cf} (-)',6));
-ylabel(ax,subsz('Estimated Nu_{cf} (-)',6));
+xlabel(ax,figaux.subsz('Measured Nu_{cf} (-)',6));
+ylabel(ax,figaux.subsz('Estimated Nu_{cf} (-)',6));
 
 
 %Text size
@@ -257,25 +246,26 @@ lgd.FontSize=7;
 
 
 %Export figure for manuscript
-fname=['Figures',filesep,'Figure',num2str(figidx)];
+fname=[dirFigs,filesep,'Figure',num2str(figidx)];
 
-t.Units='centimeters';
-t.InnerPosition=[1.5,1,8.2,8.2];
+til.Units='centimeters';
+til.InnerPosition=[1.5,1,8.2,8.2];
 
-fig.Units=t.Units;
-fig.Position(3:4)=t.OuterPosition(3:4)+1;
+fig.Units=til.Units;
+fig.Position(3:4)=til.OuterPosition(3:4)+1;
 
 exportgraphics(fig,[fname,'.tiff'],'Resolution',600);
 
 
 %Export figure for Elsevier
-t.InnerPosition=[1.5,1,8.2,8.2];
-fig.Position(3:4)=t.OuterPosition(3:4)+1;
+til.InnerPosition=[1.5,1,8.2,8.2];
+fig.Position(3:4)=til.OuterPosition(3:4)+1;
 
 exportgraphics(fig,[fname,'.eps']);
 
 
 %% Control strategy analysis
+%Set up table
 names={'Strategy','mode','Tsurf','Tbed','DeltaT','P_el',...
     'Nu_cf','ME'};
 strat={'Pel=const.';'Tsurf-Tbed=const.'};
@@ -284,6 +274,7 @@ contr=table('Size',[length(strat),length(names)],...
     'VariableNames',names);
 
 
+%Fill values
 contr.Strategy=strat;
 contr.mode(2)=true;
 
@@ -297,131 +288,58 @@ contr.ME=arrayfun(@(tf) mean(yEst(prim.mode==tf)-y(prim.mode==tf)),contr.mode);
 contr.DeltaT=contr.Tsurf-contr.Tbed;
 
 
+%Mean relative impact of Nusselt cross flow
 Nu_cfRel=contr.Nu_cf(2)./contr.Nu_cf(1);
 
 
+%% Auxiliary functions
+function monostr=monostr(i)
+    %Creates a monomial function string for pi-factor indices i
+
+    monocell=compose('x(:,%d).^b()',i);
+    monostr=strjoin(monocell,'.*');
+end
 
 
+function [str,n]=bidx(str)
+    %Adds indices to the regression coefficient b in order of appearance
+    %Output n: number of regression coefficients
+
+    idx=strfind(str,'b()');
+    n=numel(idx);
+    for i=1:n
+        str=[str(1:idx(i)+1),num2str(i),str(idx(i)+2:end)];
+        idx=idx+1;
+    end
+end
 
 
-
-% %% Model 4b1
-% % 
-% fx=@(b,x) ...
-%     b(1).*x(:,7)./...
-%     (1+b(2).*(x(:,6)./x(:,10)).^(1/3)./x(:,10).*...
-%     (1-exp(-6.45824254376922e-05.*x(:,8))).*...
-%     (1+0.28.*x(:,7).^2.*sqrt(x(:,4)).*x(:,5).*x(:,6)).*...
-%     (1+(x(:,5)./x(:,10)).^b(3).*(1-x(:,9)).^b(4)));
-% 
-% 
-% beta0=[0.05,1,1,1]';
-% 
-% [mdl_4b1,beta_4b1]=getFit(X,y,fx,beta0);
-% 
-% checkFit(X,y,fx,beta_4b1,'4b1',13);
-% 
-% 
-% %% Model 4b2
-% % 
-% fx=@(b,x) ...
-%     b(1).*x(:,7)./...
-%     (1+b(2).*(x(:,6)./x(:,10)).^(1/3)./x(:,10).*...
-%     (1-exp(-6.45824254376922e-05.*x(:,8))).*...
-%     (1+0.28.*x(:,7).^2.*sqrt(x(:,4)).*x(:,5).*x(:,6)).*...
-%     (1+(x(:,5)./x(:,10)).^b(3).*(1-x(:,9)).^b(3)));
-% 
-% 
-% beta0=[0.05,1,1]';
-% 
-% [mdl_4b2,beta_4b2]=getFit(X,y,fx,beta0);
-% 
-% checkFit(X,y,fx,beta_4b2,'4b2',14);
-% 
-% 
-% %% Model 4c1
-% % 
-% fx=@(b,x) ...
-%     b(1).*x(:,7)./...
-%     (1+b(2).*(x(:,6)./x(:,10)).^(1/3)./x(:,10).*...
-%     (1-exp(-6.45824254376922e-05.*x(:,8))).*...
-%     (1+0.28.*x(:,7).^2.*sqrt(x(:,4)).*x(:,5).*x(:,6)).*...
-%     (1+(x(:,5)./x(:,6)).^b(3).*(x(:,5)./x(:,10)).^b(4).*(1-x(:,9)).^b(5)));
-% 
-% 
-% beta0=[0.05,1,1,1,1]';
-% 
-% [mdl_4c1,beta_4c1]=getFit(X,y,fx,beta0);
-% 
-% checkFit(X,y,fx,beta_4c1,'4c1',15);
-% 
-% 
-% %% Model 4c2
-% % All Model 4s: poor R²_adj compared to Model 3s
-% fx=@(b,x) ...
-%     b(1).*x(:,7)./...
-%     (1+b(2).*(x(:,6)./x(:,10)).^(1/3)./x(:,10).*...
-%     (1-exp(-6.45824254376922e-05.*x(:,8))).*...
-%     (1+0.28.*x(:,7).^2.*sqrt(x(:,4)).*x(:,5).*x(:,6)).*...
-%     (1+(x(:,5)./x(:,6)).^b(3).*(x(:,5)./x(:,10)).^b(4).*(1-x(:,9)).^(b(3)+b(4))));
-% 
-% 
-% beta0=[0.05,1,1,1]';
-% 
-% [mdl_4c2,beta_4c2]=getFit(X,y,fx,beta0);
-% 
-% checkFit(X,y,fx,beta_4c2,'4c2',16);
+function [str,n]=couple(str,i)
+    %Couples the exponents of pi-factors i in the function string str
+    %Output n: number of regression coefficients
 
 
-% %% Model 5c2
-% % 
-% fx=@(b,x) ...
-%     b(1).*x(:,7)./...
-%     (1+b(2).*(x(:,6)./x(:,10)).^(1/3)./x(:,10).*...
-%     (1-exp(-6.45824254376922e-05.*x(:,8))).*...
-%     (1+0.28.*x(:,7).^2.*sqrt(x(:,4)).*x(:,5).*x(:,6)).*...
-%     (x(:,5)./x(:,6)).^b(3).*(1-x(:,9)).^b(3));
-% 
-% 
-% beta0=[0.05,1,1]';
-% 
-% [mdl_5c2,beta_5c2]=getFit(X,y,fx,beta0);
-% 
-% checkFit(X,y,fx,beta_5c2,'5c2',17);
+    %Search string for regular expression: b-index of pi-factor x
+    s=@(x) ['(?<=x\(:,',num2str(x),'\)\)?\.\^\(?b\()\d+'];
 
 
-% %% Model 6c2
-% % p-value of b(2) and b(3) is fairly high compared to Model 5
-% fx=@(b,x) ...
-%     b(1).*x(:,7)./...
-%     (1+b(2).*(x(:,6)./x(:,10)).^(1/3)./x(:,10).*...
-%     (1-exp(-6.45824254376922e-05.*x(:,8))).*...
-%     (1+0.28.*x(:,7).^2.*sqrt(x(:,4)).*x(:,5).*x(:,6)).*...
-%     (x(:,5)./x(:,6)).^b(3).*(x(:,5)./x(:,10)).^b(4).*(1-x(:,9)).^(b(3)+b(4)));
-% 
-% 
-% beta0=[0.05,1,1,1]';
-% 
-% [mdl_6c2,beta_6c2]=getFit(X,y,fx,beta0);
-% 
-% checkFit(X,y,fx,beta_6c2,'6c2',18);
+    %Search for first appearance of first b-index
+    idx=regexp(str,s(i(1)));
+    idx=str(idx);
 
 
-% %% Model 7c2
-% % 
-% fx=@(b,x) ...
-%     b(1).*x(:,7)./...
-%     (1+b(2).*(x(:,6)./x(:,10)).^(1/3)./x(:,10).*...
-%     tanh(b(4).*x(:,8)).*...
-%     (1+b(5).*x(:,7).^2.*sqrt(x(:,4)).*x(:,5).*x(:,6)).*...
-%     (x(:,5)./x(:,6)).^b(3).*(1-x(:,9)).^b(3));
-% 
-% 
-% beta0=[0.05,1,1,4.5e-7,0.33]';
-% 
-% [mdl_7c2,beta_7c2]=getFit(X,y,fx,beta0);
-% 
-% checkFit(X,y,fx,beta_7c2,'7c2',19);
+    %Replace every b-index of coupled pi-factors with first b-index
+    for k=i
+        str=regexprep(str,s(k),idx);
+    end
+
+
+    %Number of regression coefficients remaining
+    i=regexp(str,'b\((\d*)\)','tokens');
+    i=[i{:}];
+    n=max(str2double(i));
+end
+
 
 
 

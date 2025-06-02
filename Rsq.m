@@ -1,7 +1,46 @@
+%% Coefficient of determination R²
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%
+% Part of the paper:
+%
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All data, along with methodology reports and supplementary documentation, 
+% is published in the data repository:
+% https://doi.org/10.5281/zenodo.15576311
+%
+% All required files for this script can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository
+%
+%
+%
+% This function calculates the coefficient of determination R².
+%
+%
+%Requires all auxiliary classes and functions on the MATLAB path
+%
+%Required products, version 24.1:
+%   - MATLAB
+%Necessary classes, functions, files, and scripts:
+%   - None
+
+
 function Rsq=Rsq(y,yHat,M)
-    %y: observed data
-    %yHat: estimated / predicted / modeled / fitted data
-    %M: (optional) number of regressors excluding intercept
+    % Inputs:
+    % y: observed data
+    % yHat: estimated / predicted / modeled / fitted data
+    % M: (optional) number of regressors excluding intercept
+    % 
+    % 
+    % Outputs:
+    % Rsq: coefficient of determination. If the function is called with a
+    %       number of regressors M (third parameter), Rsq is the adjusted
+    %       coefficient of determination
     
 
     %Normalize inputs

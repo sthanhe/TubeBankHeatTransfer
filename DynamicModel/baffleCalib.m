@@ -1,27 +1,24 @@
 %% Baffle Calibration
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Part of the paper:
+% Part of the paper:
 %
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Chemical Engineering Research and Design 2025
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+% 
+% Slight adaptation of the file of the same name in:
 %
-%All data, along with methodology reports and supplementary documentation, 
-%is published in the data repository:
-%https://doi.org/10.5281/zenodo.7924693
-%
-%All required files for this script can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% S. Thanheiser, Particle Dispersion Model Software. (Feb. 07, 2025). 
+% Zenodo. doi: 10.5281/zenodo.14833128.
 %
 %
 %
-%This script calculates the baffle correction factors to account for their
-%influence on particle dispersion. It gets called by either the static or
-%dynamic preparation scripts, "prepStatic" or "prepDynamic".
+% This script calculates the baffle correction factors to account for their
+% influence on particle dispersion. It gets called by the static preparation
+% script "prepStatic".
 %
 %
 %Required products, version 24.1:
@@ -43,6 +40,15 @@
 %   - dynamicModel.slx
 
 
+%% Load dynamic model
+mdl='dynamicModel';
+sys=load_system(mdl);
+mdlPostLoadFx;
+
+% set_param(mdl,"FastRestart","on");
+% cleanup=onCleanup(@() set_param(mdl,"FastRestart","off"));
+
+
 %% Prepare table
 hIdx=[1,4,6];   %Bed level indices
 names={'PhigateLow','PhigateHigh',...
@@ -62,9 +68,7 @@ tab.PhigateHigh=tab.PhigateLow.*1.005;
 tab.baffleLow=ones(height(tab),1);
 tab.baffleHigh=150*ones(height(tab),1);
 
-% ACactive=true(1,height(flow));
 ACactive=(flow.AC1<0.6)';    %Runs where air cushion is active in the beginning
-% tab.baffleLow(ACactive)=20;
 
 
 %Baffle correction factor matrix
@@ -87,8 +91,8 @@ xInit=out.xFinal;   %Initial state for other simulations = end state of this sim
 
 %% Phigate (weir boundary condition)
 for i=1:height(flow)
-    p0=flow.p0(i);          %Ambient pressure
-    bc=getBIC(flow(i,:),direction);   %Get other boundary conditions
+    p0=flow.p0(i);                      %Ambient pressure
+    bc=getBIC(flow(i,:),direction);     %Get other boundary conditions
 
 
     %Simulate low Phigate estimate
@@ -228,7 +232,6 @@ run=1:height(flow);     %Runs to analyze
 
 %Get baffle correction factors
 getBCF;
-delete(cleanup);    %Deactivate fast restart
 
 
 %% Add baffle correction matrix to flow table

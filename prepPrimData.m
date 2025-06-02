@@ -1,10 +1,64 @@
-%% Set data directories
-dirData=['Data',filesep,'Own'];             %Path to directory containing the data
-dirFigures='Figures';       %Path to directory where figures should be stored
-dirTabs='Tables';       %Path to directory where tables should be stored
+%% Prepare analysis of primary data
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%
+% Part of the paper:
+%
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All data, along with methodology reports and supplementary documentation, 
+% is published in the data repository:
+% https://doi.org/10.5281/zenodo.15576311
+%
+% All required files for this script can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository
+%
+%
+%
+% This script conducts a basic analysis of the collected primary data and
+% saves the results for the main analysis conducted by the script "calcCF".
+% It also creates Figures published in the Methodology Report in the data
+% repository.
+%
+%
+%Requires all auxiliary classes and functions on the MATLAB path
+%
+%Required products, version 24.1:
+%   - MATLAB
+%   - Statistics and Machine Learning Toolbox
+%   - Curve Fitting Toolbox
+%Necessary classes, functions, files, and scripts:
+%   - @DC04
+%   - @DryAir
+%   - @FluBed
+%   - @Orifice
+%   - @SiO2
+%   - @figaux
+%   - @implExp
+%   - center.m
+%   - covplot.m
+%   - getConstants.m
+%   - getProp.m
+%   - h2FG.mat --> created by the script "prepFG" 
 
-if ~isfolder(dirFigures)
-    mkdir(dirFigures);
+
+%% Set data locations
+dirData=['Data',filesep,'Own'];             %Data storage folder
+dirFigs=['Figures',filesep,'PrimData'];     %Figure storage folder
+dirTabs='Tables';                           %Table storage folder
+
+
+%% Make folders if they do not exist
+if ~isfolder(dirFigs)
+    mkdir(dirFigs);
+end
+
+if ~isfolder(dirTabs)
+    mkdir(dirTabs);
 end
 
 
@@ -36,11 +90,10 @@ prim=table('Size',[length(fnames),length(names)],...
 
 
 %% Read individual files and do calculations
-chambers=1:6;
 for i=1:length(fnames)
     %Get properties
     tab=readtable([dirData,filesep,fnames{i}]);
-    TT=getProp(tab,c,prim.Properties.VariableNames(2:end),chambers);
+    TT=getProp(tab,c,prim.Properties.VariableNames(2:end),1:6);
     
     
     %Remove outliers
@@ -75,14 +128,14 @@ testmat.w_p=round(prim.w_p,4);
 
 
 %Categorize parameters
-Tbedcat=center(prim.Tbed-273.15,[330,400,450]-273.15);
-Tbedcat=unique(Tbedcat);
-Tbedcat=round(Tbedcat/5)*5;
+TbedCat=center(prim.Tbed-273.15,[330,400,450]-273.15);
+TbedCat=unique(TbedCat);
+TbedCat=round(TbedCat/5)*5;
 
 FGcat=center(prim.FG,[2.5,3.1,3.7]);
 FGcat=round(unique(FGcat),1);
 
-w_pcat=unique(testmat.w_p);
+w_pCat=unique(testmat.w_p);
 
 
 %Print test matrix
@@ -124,27 +177,51 @@ for i=1:height(prim)
 end
 
 
+%% Dimensionless numbers
+npi=10;
+pis=table('Size',[height(prim),npi],...
+    'VariableTypes',repmat({'double'},1,npi),...
+    'VariableNames',compose('pi%d',1:npi));
+
+
+[pis{:,:},k_g,l_lam]=FluBed.piFactors(prim.w,prim.Tbed,prim.p,c.d_p,c.rho_p,...
+    c.phi_s,c.eps_mf,SiO2.c_p(prim.Tbed),c.d_t,c.p_hEff,prim.w_p);
+
+
 %% Estimated bias due to fins
+%Regressor: dimensionless mean horizontal particle velocity pi10
+X=pis.pi10;
+
+
 %Particle and gas convective HTC according to the extended model
-[h,Nu]=FluBed.molExt(prim.w,prim.Tbed,prim.p,c.d_p,c.rho_p,c.phi_s,c.eps_mf,...
+[h,Nu]=FluBed.extended(prim.w,prim.Tbed,prim.p,c.d_p,c.rho_p,c.phi_s,c.eps_mf,...
     @SiO2.c_p,c.d_t,c.p_hEff,0);
 
-prim.h_pcExt=h.pc;
-prim.h_gcExt=h.gc;
+
+%Effective Nusselt number
+Nu_eff=prim.h_eff.*l_lam./k_g;
 
 
-%Fit relation between residual heat transfer (=cross-flow HTC) and particle
-%velocity
-X=prim.w_p;                 %Regressor: particle velocity
-y=prim.h_eff-h.pc-h.gc;     %Response: residual HTC
+%Response variable: residual heat transfer (=cross-flow Nu)
+y=Nu_eff-Nu.pc-Nu.gc;
 
-fx=@(b,x) b(1)./(x+b(2));           %Model: rat01
-beta0=[-2,0.02];                    %Starting values (estimates)
-mdl=fitnlm(X,y,fx,beta0);           %Fit model
-beta=mdl.Coefficients.Estimate;     %Estimated coefficients
 
+%Bin and center regressor and response variable
+[Xc,Xm,n]=center(X,[0.25,0.6,1.2,2.5]);
+ym=arrayfun(@(i) mean(y(Xc==i)),Xm);
+
+
+%Fit function to centered values
+fx=@(b,x) b(1)./(x+b(2));   %rat01
+beta0=[-0.1,5];             %Starting values (estimates)
+
+mdl=fitnlm(Xm,ym,fx,beta0,'Weights',n);     %Fit model
+beta=mdl.Coefficients.Estimate;             %Estimated coefficients
+
+
+%Cross-flow Nusselt number
 bias=predict(mdl,0);                    %Estimated bias
-prim.h_cf=prim.h_eff-h.pc-h.gc-bias;    %Estimated cross-flow HTC
+prim.Nu_cf=Nu_eff-Nu.pc-Nu.gc-bias;     %Estimated cross-flow Nu
 
 
 %Set up figure
@@ -157,12 +234,15 @@ hold(ax,'on');
 
 
 %Plot data and lines
-x=linspace(0,max(prim.w_p),1000);
-scatter(ax,X,prim.h_eff-h.pc-h.gc,18,colors(1,:));
+x=linspace(0,max(X),1000);
+
+scatter(ax,X,y,18,colors(1,:));
 plot(ax,x,predict(mdl,x'),'Color',colors(1,:));
 
-scatter(ax,X,prim.h_cf,18,colors(2,:));
+scatter(ax,X,prim.Nu_cf,18,colors(2,:));
 plot(ax,x,predict(mdl,x')-bias,'Color',colors(2,:));
+
+scatter(ax,Xm,ym,72,colors(4,:),'Marker','x','LineWidth',2);
 
 
 %Set up legend
@@ -174,11 +254,11 @@ hold(ax,'off');
 
 
 %Set legend, axes labels, and title
-legend(ax,legItems,{'h_{cf}','h_{eff} - h_{pcExt} - h_{gcExt}'},...
+legend(ax,legItems,{'Nu_{cf}','Nu_{eff} - Nu_{pcExt} - Nu_{gc}'},...
     'Location','southeast');
 
-xlabel(ax,'w_p (m/s)');
-ylabel(ax,'HTC (W/m²K)');
+xlabel(ax,'\pi_{10} (-)');
+ylabel(ax,'Nu_{cf} (-)');
 
 title(ax,compose('R² = %.4f',mdl.Rsquared.Ordinary));
 
@@ -192,52 +272,19 @@ fig.Position(3:4)=t.OuterPosition(3:4)+0.5;
 
 
 %Add arrow
-x=[0,0];
-y=[0,bias];
-figaux.arrow(ax,x,y,'doublearrow');
-text(ax,x(1),mean(y),compose(' bias = %.0f W/m²K',bias));
+xArr=[0,0];
+yArr=[0,bias];
+figaux.arrow(ax,xArr,yArr,'doublearrow');
+text(ax,x(1),bias./2,compose(' bias = %.1e',bias));
 
 
 %Export figure
-exportgraphics(fig,[dirFigures,filesep,'finBias.tiff'],'Resolution',600);
+exportgraphics(fig,[dirFigs,filesep,'finBias.tiff'],'Resolution',600);
 
 
-%% Dimensionless numbers
-npi=10;
-pis=table('Size',[height(prim),npi],...
-    'VariableTypes',repmat({'double'},1,npi),...
-    'VariableNames',compose('pi%d',1:npi));
-
-
-[pis{:,:},k_g,l_lam]=FluBed.piFactors(prim.w,prim.Tbed,prim.p,c.d_p,c.rho_p,...
-    c.phi_s,c.eps_mf,SiO2.c_p(prim.Tbed),c.d_t,c.p_hEff,prim.w_p);
-
-
-pis{:,1}=prim.h_cf.*l_lam./k_g;
-
-
-%% Save for future analysis
-save('primData','prim','pis');
-
-
-%% Univariate plot
-%Set directory and create it if it does not exist
-dirPrim=[dirFigures,filesep,'PrimData'];
-
-if ~isfolder(dirPrim)
-    mkdir(dirPrim);
-end
-
-
-%Normalize (z-score)
-pisNorm=normalize(pis);
-
-
-%Set constants to 0
-isconst=arrayfun(@(i) ...
-    isscalar(unique(pis(:,i))),...
-    1:size(pisNorm,2));
-pisNorm{:,isconst}=0;
+%% Relative contribution of particle cross-flow
+%Maximum contribution
+maxContr=max(prim.Nu_cf./(Nu_eff-predict(mdl,0)));
 
 
 %Set up figure
@@ -245,35 +292,82 @@ fig=figure(918);
 clf(fig);
 t=tiledlayout(fig,1,1,'Padding','tight');
 ax=nexttile(t);
-
-boxchart(ax,pisNorm{:,:});
-
-
-%Axes labels and title
-xlabel(ax,'\pi-index (-)');
-ylabel(ax,'z-score (-)');
+colors=ax.ColorOrder;
+hold(ax,'on');
 
 
-%Export figure for repository
+%Plot data and lines
+pos=prim.Nu_cf>0;
+scatter(ax,prim.Nu_cf(pos),prim.Nu_cf(pos)./(Nu_eff(pos)-predict(mdl,0)));
+scatter(ax,prim.Nu_cf(~pos),prim.Nu_cf(~pos)./(Nu_eff(~pos)-predict(mdl,0)));
+
+xline(ax,0);
+yline(ax,0);
+
+hold(ax,'off');
+
+
+%Set axes labels
+xlabel(ax,'Nu_{cf} (-)');
+ylabel(ax,'Nu_{cf} / (Nu_{eff} - bias) (-)');
+
+
+%Size figure for repository
 t.Units='centimeters';
 t.OuterPosition=[0,0,17,8.5];
 
 fig.Units=t.Units;
 fig.Position(3:4)=t.OuterPosition(3:4)+0.5;
 
-exportgraphics(fig,[dirPrim,filesep,'Univariate.tiff'],...
+
+%Export figure
+exportgraphics(fig,[dirFigs,filesep,'crossFlowContr.tiff'],...
     'Resolution',600);
 
 
+%% Remove outliers, save for future analysis
+%Outliers=negative Nu_cf
+neg=find(~pos);
+prim(neg,:)=[];
+pis(neg,:)=[];
+
+
+%Correct outlier indices of test matrix by previously removed outliers
+for i=flip(outliers)
+    neg(neg>=i)=neg(neg>=i)+1;
+end
+
+
+%Add pi1=Nu_cf to pi-table
+pis.pi1=prim.Nu_cf;
+
+
+%Save data
+save('primData','prim','pis');
+
+
+%% Univariate plot
+[fig,~,ax]=uniplot(pis{:,:},919);
+
+
+%x-axis label
+xlabel(ax,'\pi-index (-)');
+
+
+%Export figure for repository
+exportgraphics(fig,[dirFigs,filesep,'Univariate.tiff'],...
+        'Resolution',600);
+
+
 %% Bivariate plot
-fig=covplot(pis{:,:},compose('\\pi_{%d}',1:npi),919);
+fig=covplot(pis{:,:},compose('\\pi_{%d}',1:npi),920);
 
 
 %Export figure for repository (full screen)
 fig.Units='normalized';
 fig.Position=[0,0,1,1];
 
-exportgraphics(fig,[dirPrim,filesep,'Bivariate.tiff'],...
+exportgraphics(fig,[dirFigs,filesep,'Bivariate.tiff'],...
     'Resolution',600);
 
 

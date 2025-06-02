@@ -1,31 +1,24 @@
 %% Prepare Stationary Test Analysis
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Part of the paper:
+% Part of the paper:
 %
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Chemical Engineering Research and Design 2025
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+% 
+% Slight adaptation of the file of the same name in:
 %
-%All data, along with methodology reports and supplementary documentation, 
-%is published in the data repository:
-%https://doi.org/10.5281/zenodo.7924693
-%
-%All required files for this script can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% S. Thanheiser, Particle Dispersion Model Software. (Feb. 07, 2025). 
+% Zenodo. doi: 10.5281/zenodo.14833128.
 %
 %
 %
 %This script prepares the data of the stationary tests for further analysis
 %by the "calcStatic" script.
-%
-%
-%Requires the file "stat_SumPartDisp.csv" that summarizes the particle 
-%dispersion measurements, which gets created by the script "calcPartDisp" 
-%and stored in the dirStationary folder ("../DataStationary" by default).
+% 
 %
 %Required products, version 24.1:
 %   - MATLAB
@@ -48,29 +41,61 @@
 %   - stat_SumPartDisp.csv
 
 
-%% Set data directories
-dirStationary='DataStationary';     %Path to directory where stationary simulation data should be stored
-dirFigures='../Figures/DynamicSims';               %Path to directory where figures should be stored
+%% Prepare analysis
+%Get constants
+c=getConstants();
 
-%Create directory if it does not exist
-if ~isfolder(dirFigures)
-    mkdir(dirFigures);
+
+%Retrieve filenames
+dirCont=dir(dirData);   %Content of directory containing the data
+files={dirCont(~[dirCont.isdir]).name}';
+files=files(startsWith(files,'heatTransfer_'));
+
+%Retain natural order of runs
+idx=str2double(extract(files,digitsPattern));
+[~,idx]=sort(idx);
+files=files(idx);
+
+
+%Set up table for mean values
+chambers=1:6;
+nPi=5;
+hNames=compose('h%d',chambers);
+names=[{'Run','p0','mDotSand','mDotS',...
+        'Tbed2','rho_g2','D2','Ar2',...
+        'w_e2','wmf2','FG2','FG3',...
+        'Tleft','Tcenter','Tright',...
+        'epsLeft','epsCenter','epsRight'},...
+        compose('AC%d',1:2),compose('AC%dset',1:2),...
+        compose('air%d',1:4),...
+        hNames,...
+        compose('w_p%d',chambers),...
+        compose('Phi%d',chambers),...
+        compose('pi%d',1:nPi)];
+flow=table('Size',[length(files),length(names)],...
+            'VariableTypes',repmat({'double'},1,length(names)));
+flow.Properties.VariableNames=names;
+clear('names');
+
+
+%% Read individual files and do calculations
+for i=1:length(files)
+    %Get properties
+    tab=readtable([dirData,filesep,files{i}]);
+    pDisp=getProp(tab,c,flow.Properties.VariableNames(2:end-nPi),chambers);
+    
+    
+    %Get means
+    flow{i,2:end-nPi}=mean(pDisp{:,2:end},1,'omitnan');
+    flow.Run(i)=i;
 end
 
 
-%% Load dynamic model and activate fast restart
-mdl='dynamicModel';
-sys=load_system(mdl);
-mdlPostLoadFx;
-
-set_param(mdl,"FastRestart","on");
-cleanup=onCleanup(@() set_param(mdl,"FastRestart","off"));
+%Add persistent bed levels
+flow{:,hNames}=flow{:,hNames}+c.hBed;
 
 
-%% Load data
-flow=readtable([dirStationary,filesep,'stat_SumPartDisp.csv']);
-
-%Add variables: weir boundary condition and individual baffle correction factors
+%Add weir boundary condition and individual baffle correction factors
 flow.Phigate=zeros(height(flow),1);
 
 flow.baffleCorr1=ones(height(flow),1);
@@ -80,10 +105,6 @@ flow.baffleCorr3=ones(height(flow),1);
 
 %% Do baffle calibration
 baffleCalib;
-
-
-%Record table for future analysis
-writetable(flow,[dirStationary,filesep,'stat_SumPrep.csv']);
 
 
 

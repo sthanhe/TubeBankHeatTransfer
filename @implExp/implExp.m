@@ -1,17 +1,22 @@
 %% Auxiliary Functions for Implicit Expansion
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Part of the paper:
+% Modified from:
+% Stefan Thanheiser, "Particle Dispersion Model Software”. Zenodo, Feb. 
+% 07, 2025. doi: 10.5281/zenodo.14833128.
 %
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Applied Thermal Energy 2024
 %
-%All required files for this class can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% Part of the paper:
+%
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All required files for this class can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository here: https://doi.org/10.5281/zenodo.15576311
 %
 %
 %
@@ -20,8 +25,8 @@
 %
 %Requires all files packaged in the class folder and on the MATLAB path
 %
-%Required products:
-%   - MATLAB, version 9.14
+%Required products, version 24.1:
+%   - MATLAB
 
 
 classdef implExp
@@ -48,7 +53,7 @@ classdef implExp
 
 
         function varargout=normalize(sz,varargin)
-            %Converts all arrays in varargin to a line vectors when the
+            %Converts all arrays in varargin to line vectors when the
             %arrays are expected to have the size sz after implicit
             %expansion
 

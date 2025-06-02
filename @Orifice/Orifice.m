@@ -1,35 +1,42 @@
 %% Orifice Plate Calculation 
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156%
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Part of the paper:
-%
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Applied Thermal Energy 2024
-%
-%All required files for this class can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% Modified from:
+% Stefan Thanheiser, "Particle Dispersion Model Software”. Zenodo, Feb. 
+% 07, 2025. doi: 10.5281/zenodo.14833128.
 %
 %
+% Part of the paper:
 %
-%This class calculates the mass flow of dry air through an orifice plate
-%based on EN ISO 51677 (method qm)
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All required files for this class can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository here: https://doi.org/10.5281/zenodo.15576311
+%
+%
+%
+% This class calculates the mass flow of dry air through an orifice plate
+% based on EN ISO 51677 (method qm)
 %
 %
 %Requires all files packaged in the class folder and on the MATLAB path
 %
-%Required products:
-%   - MATLAB, version 9.14
+%Required products, version 24.1:
+%   - MATLAB
 %Additional classes:
-%   - DryAir
+%   - @DryAir
 
 
 classdef Orifice
     %All parameters and results in SI base units
 
+
+    %% Property functions
     methods(Static)
         function [qm,deltaOmega]=qm(p1,p2,T1,d,D,tap)  
             %qm: Mass flow through orifice plate
@@ -135,4 +142,7 @@ classdef Orifice
 
     end
 end
+
+
+
 

@@ -1,10 +1,68 @@
-function checkFit(X,y,fx,beta,name,figidx,small,dirFigs)
-    yPred=fx(beta,X);
-    % isNeg=yPred<-1e-3;
-    % yPred(isNeg)=[];
-    % y(isNeg)=[];
+%% Check results of regression graphically
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%
+% Part of the paper:
+%
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All data, along with methodology reports and supplementary documentation, 
+% is published in the data repository:
+% https://doi.org/10.5281/zenodo.15576311
+%
+% All required files for this script can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository
+%
+%
+%
+% This function checks the results of any regression by plotting the 
+% estimates against the measurements. It also provides some helpful 
+% insights into the quality of the regression and possible issues.  
+%
+%
+%Requires all auxiliary classes and functions on the MATLAB path
+%
+%Required products, version 24.1:
+%   - MATLAB
+%Necessary classes, functions, files, and scripts:
+%   - None
 
 
+function [fig,t,ax]=checkFit(X,y,fx,beta,name,figidx,small,dirFigs,lim)
+    % Inputs:
+    % X: regressor matrix, double [m,n]
+    % y: response variable, double [m,1]
+    % fx: model function in the form fx(b,X), where b are the regression
+    %       coefficients, function handle
+    % beta: regression coefficients, double
+    % name: model name, char
+    % figidx: index of figure window, double
+    % small: indicator whether to create the small figure version, logical
+    % dirFigs: path to directore where figures should be stored, char
+    % lim: upper axes limit (optional)
+    % 
+    % Outputs:
+    % fig: figure handle
+    % t: tile handle
+    % ax: axis handle
+    % 
+    % 
+    % call this function right after the regression for best results
+
+
+    %Model estimates: remove negative values
+    yEst=fx(beta,X);
+
+    isNeg=yEst<-1e-3;
+    yEst(isNeg)=[];
+    y(isNeg)=[];
+
+
+    %Marker and figure size, figure name, figure title
     if small
         mkrsz=18;
         inPos=[1.5,1,4.7,4.7];
@@ -15,6 +73,7 @@ function checkFit(X,y,fx,beta,name,figidx,small,dirFigs)
         fname=[dirFigs,filesep,'Model_',name];
 
 
+        %Display warning message from fit in title
         [~,id]=lastwarn();
         txt=['Model ',name];
         switch id
@@ -25,12 +84,15 @@ function checkFit(X,y,fx,beta,name,figidx,small,dirFigs)
             case ''
         end
     
+
+        %Display negative regression coefficients in title
         isNeg=find(beta<0);
         negTitle=compose(', \\beta_%d=%.3f',isNeg,beta(isNeg));
         txt=[txt,negTitle{:}];
     end
 
 
+    %Set up figure
     if figidx==0
         fig=figure(100);
     else
@@ -42,24 +104,30 @@ function checkFit(X,y,fx,beta,name,figidx,small,dirFigs)
     colors=ax.ColorOrder;
     hold(ax,'on');
     
-    scatter(ax,y,yPred,mkrsz);
+
+    %Plot data
+    scatter(ax,y,yEst,mkrsz);
     
-    lim=max([ax.XLim(2),ax.YLim(2)]);
+
+    %Plot equivalence lines
+    if nargin<9
+        lim=max([ax.XLim(2),ax.YLim(2)]);
+    end
     eq=linspace(0,lim,100);
     
     plot(ax,eq,eq,'Color',colors(2,:));
     plot(ax,eq,eq.*1.2,'Color',colors(2,:),'LineStyle','--');
     plot(ax,eq,eq./1.2,'Color',colors(2,:),'LineStyle','--');
     
-    
     hold(ax,'off');
     
     
-    % ax.XLim=[0,lim];
-    % ax.YLim=[0,lim];
+    %Axes limits
+    ax.XLim=[0,lim];
+    ax.YLim=[0,lim];
 
     
-    
+    %Axes appearance
     if small
         ax.Visible='off';
     else
@@ -79,68 +147,6 @@ function checkFit(X,y,fx,beta,name,figidx,small,dirFigs)
     
     exportgraphics(fig,[fname,'.tiff'],'Resolution',600);
 end
-
-
-
-
-% function plotFit(X,y,fx,beta,name,figidx)
-%     yPred=fx(beta,X);
-%     % isNeg=yPred<-1e-3;
-%     % yPred(isNeg)=[];
-%     % y(isNeg)=[];
-% 
-% 
-%     fig=figure(figidx);
-%     clf(fig);
-%     ax=gca;
-%     colors=ax.ColorOrder;
-%     hold(ax,'on');
-% 
-%     scatter(ax,y,yPred,18);
-% 
-%     lim=max([ax.XLim(2),ax.YLim(2)]);
-%     eq=linspace(0,lim,100);
-% 
-%     plot(ax,eq,eq,'Color',colors(2,:));
-%     plot(ax,eq,eq.*1.2,'Color',colors(2,:),'LineStyle','--');
-%     plot(ax,eq,eq./1.2,'Color',colors(2,:),'LineStyle','--');
-% 
-% 
-%     hold(ax,'off');
-% 
-% 
-%     ax.XLim=[0,lim];
-%     ax.YLim=[0,lim];
-% 
-%     ax.Visible='off';
-% 
-%     fig.Units='centimeters';
-%     fig.Position=[10,5,6.23,5.85];
-% 
-%     exportgraphics(fig,[name,'.tiff'],'Resolution',600);
-% 
-% 
-% 
-%     % xlabel(ax,'Measured \pi_1 (-)');
-%     % ylabel(ax,'Predicted \pi_1 (-)');
-% 
-% 
-%     % [~,id]=lastwarn();
-%     % t=['Model ',name];
-%     % switch id
-%     %     case 'stats:nlinfit:ModelConstantWRTParam'
-%     %         t=[t,', Insensitive Parameters'];
-%     %     case 'stats:nlinfit:IllConditionedJacobian'
-%     %         t=[t,', Ill-Conditioned Jacobian'];
-%     %     case ''
-%     % end
-%     % 
-%     % isNeg=find(beta<0);
-%     % negTitle=compose(', \\beta_%d=%.3f',isNeg,beta(isNeg));
-%     % t=[t,negTitle{:}];
-%     % 
-%     % title(ax,t);
-% end
 
 
 

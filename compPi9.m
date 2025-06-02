@@ -1,4 +1,53 @@
+%% Compare results to other models for tube packing density (pi9)
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%
+% Part of the paper:
+%
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All data, along with methodology reports and supplementary documentation, 
+% is published in the data repository:
+% https://doi.org/10.5281/zenodo.15576311
+%
+% All required files for this script can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository
+%
+%
+%
+% This function compares the results from particle-convective regressions 
+% in "calcPC" to other published models regarding the impact of tube
+% packing density on the wall-to-bed HTC. 
+%
+%
+%Requires all auxiliary classes and functions on the MATLAB path
+%
+%Required products, version 24.1:
+%   - MATLAB
+%   - Curve Fitting Toolbox
+%Necessary classes, functions, files, and scripts:
+%   - @DryAir
+%   - @FluBed
+%   - @SiO2
+%   - @figaux
+%   - @implExp
+%   - Nu_rel.m
+
+
 function compPi9(fx,beta,dirFigs,figidx,small)
+    % Inputs:
+    % fx: model function in the form fx(b,X), where b are the regression
+    %       coefficients, function handle
+    % beta: regression coefficients, double
+    % dirFigs: path to directore where figures should be stored, char
+    % figidx: index of figure window, double
+    % small: indicator whether to create the small figure version, logical
+
+
     %% Extended model
     %Basic parameters
     p=1e5;      %Pressure
@@ -12,6 +61,7 @@ function compPi9(fx,beta,dirFigs,figidx,small)
     w_p=0;              %No particle cross-flow
     c_p=SiO2.c_p(T);    %Specific heat capacity: Silica particles
     
+
     %Horizontal spacing: tighter around sqrt(2)/2
     s_h=linspace(1,0.95,100);
     s_h=[s_h,linspace(0.95,sqrt(2)/2+1e-3,100)];
@@ -36,6 +86,8 @@ function compPi9(fx,beta,dirFigs,figidx,small)
     Nu_relGE(Nu_relGE~=real(Nu_relGE))=NaN;
     Nu_relGE=Nu_relGE./Nu_relGE(:,end);
     
+
+    %Ensure Nu_relGE(s_h=sqrt(2)/2)=0
     idx=isnan(Nu_relGE);
     x_GE=s_h;
     x_GE(idx)=NaN;

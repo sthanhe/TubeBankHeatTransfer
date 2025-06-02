@@ -1,3 +1,29 @@
+%% Auxiliary functions for figures
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+%
+% Part of the paper:
+%
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+%
+% All required files for this class can be found in the software
+% repository: see the link to the supplemental release in the data 
+% repository here: https://doi.org/10.5281/zenodo.15576311
+%
+%
+%
+% This class provides some auxiliary functions for plotting figures
+%
+%
+%Requires all files packaged in the class folder and on the MATLAB path
+%
+%Required products, version 24.1:
+%   - MATLAB
+
+
 classdef figaux
     methods(Static)
         function ar=arrow(ax,x,y,type,varargin)
@@ -11,10 +37,14 @@ classdef figaux
             %varargin: property, value pairs to configure the arrow. See 
             %"annotation" documentation for possible values
 
+
+            %Type=arrow if not specified otherwise
             if nargin<4
                 type='arrow';
             end
         
+
+            %Use dummy text for position indicator
             t=text(x,y,'',...
                 'HorizontalAlignment','left',...
                 'VerticalAlignment','middle');
@@ -47,8 +77,8 @@ classdef figaux
         
             %Get absolute position of axes inside figure
             pos=ax.Position;
-            pos(1)=pos(1)-2;
-            pos(2)=pos(2)-2;
+            pos(1)=pos(1)-2;    %Bias: two pixels
+            pos(2)=pos(2)-2;    %Bias: two pixels
         
             tPos={t.Position};
             tPos=vertcat(tPos{:});
@@ -97,3 +127,7 @@ classdef figaux
         end
     end
 end
+
+
+
+

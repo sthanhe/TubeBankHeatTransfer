@@ -1,31 +1,24 @@
 %% Analyze Stationary Test Measurements
-%GNU General Public License v3.0
-%By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
+% GNU General Public License v3.0
+% By Stefan Thanheiser: https://orcid.org/0000-0003-2765-1156
 %
-%Part of the paper:
+% Part of the paper:
 %
-%Thanheiser, S.; Haider, M.
-%Dispersion Model for Level Control of Bubbling Fluidized Beds with 
-%Particle Cross-Flow
-%Chemical Engineering Research and Design 2025
+% Thanheiser, S.; Haider, M.
+% Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
+% Proposal for an Extended Model Including Immersed Tube Banks and Particle 
+% Cross-Flow
+% 
+% Slight adaptation of the file of the same name in:
 %
-%All data, along with methodology reports and supplementary documentation, 
-%is published in the data repository:
-%https://doi.org/10.5281/zenodo.7924693
-%
-%All required files for this script can be found in the software
-%repository:
-%https://doi.org/10.5281/zenodo.7948224
+% S. Thanheiser, Particle Dispersion Model Software. (Feb. 07, 2025). 
+% Zenodo. doi: 10.5281/zenodo.14833128.
 %
 %
 %
 %This script analyzes the data of the stationary tests and creates all
 %published figures.
-%
-%
-%Requires the file "stat_SumPrep.csv" that summarizes the particle 
-%dispersion measurements, which gets created by the script "prepStatic" 
-%and stored in the dirStationary folder ("../DataStationary" by default).
+% 
 %
 %Required products, version 24.1:
 %   - MATLAB
@@ -47,31 +40,8 @@
 %   - stat_SumPrep.csv
 
 
-%% Set data directories
-dirStationary='DataStationary';     %Path to directory where stationary simulation data should be stored
-dirFigures='../Figures/DynamicSims';               %Path to directory where figures should be stored
-
-%Create directory if it does not exist
-if ~isfolder(dirFigures)
-    mkdir(dirFigures);
-end
-
-
-%% Load
-%Dynamic model, activate fast restart
-h2FG='dynamicModel';
-sys=load_system(h2FG);
-mdlPostLoadFx;
-
-set_param(h2FG,"FastRestart","on");
-cleanup=onCleanup(@() set_param(h2FG,"FastRestart","off"));
-
-
-%Data
-flow=readtable([dirStationary,filesep,'stat_SumPrep.csv']);
-baffleMat=flow{:,compose('baffleCorr%d',1:nABs-1)};  %Baffle correction factor matrix
-
-run=1:height(flow);   %Runs to analyze
+%% Runs to analyze
+run=1:height(flow);
 
 
 %% Initial state for faster simulations
@@ -116,37 +86,44 @@ for i=run
 end
 
 
-%Deactivate fast restart
-delete(cleanup);
-
-
-%%
+%% Dependence of fluidization on bed level gradients
+%Get differences in second chamber
 center=mean(posBedLevel(2:3));
 
 DeltaFG=FG(:,posBedLevel(3))-FG(:,center);
 Deltah=h(:,posBedLevel(3))-h(:,posBedLevel(2));
 
+
+%Remove outliers: reversed bed level gradients
 outliers=Deltah>0;
 DeltaFG(outliers)=NaN;
 Deltah(outliers)=NaN;
 
+
+%Linear regression
 h2FG=fitlm(Deltah,DeltaFG);
-save(['..',filesep,'h2FG.mat'],'h2FG');
+save([dirOrig,filesep,'h2FG.mat'],'h2FG');
 
 
-fig=figure(914);
+%% Plot
+%Set up figure
+fig=figure(916);
 clf(fig);
 t=tiledlayout(fig,1,1,'Padding','tight');
 ax=nexttile(t);
 colors=ax.ColorOrder;
 hold(ax,'on');
 
+
+%Plot data and lines
 mm=1000;
 scatter(Deltah*mm,DeltaFG);
 p=plot(Deltah*mm,predict(h2FG,Deltah));
 
 hold(ax,'off');
 
+
+%Set axes labels and legend
 xlabel(ax,'h_4 - h_5 (mm)')
 ylabel(ax,'FG(h_4) - FG_2 (-)')
 
