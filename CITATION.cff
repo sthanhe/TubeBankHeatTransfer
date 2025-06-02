@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+title: Extended Heat Transfer Model Software
+type: software
+authors:
+  - given-names: Stefan
+    family-names: Thanheiser
+    email: stefan.thanheiser@tuwien.ac.at
+    affiliation: TU Wien
+    orcid: https://orcid.org/0000-0003-2765-1156
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.15576311
+    description: Zenodo-link to dataset
+abstract: Software repository for the extended heat transfer model.
+keywords:
+  - fluidized bed heat exchanger
+  - tube bundle
+  - contact time
+  - pitch
+  - lateral mixing
+  - thermal energy storage
+license: GPL-3.0
