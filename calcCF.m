@@ -4,7 +4,7 @@
 %
 % Part of the paper:
 %
-% Thanheiser, S.; Haider, M.
+% Thanheiser, S.
 % Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
 % Proposal for an Extended Model Including Immersed Tube Banks and Particle 
 % Cross-Flow
@@ -14,8 +14,8 @@
 % https://doi.org/10.5281/zenodo.15576311
 %
 % All required files for this script can be found in the software
-% repository: see the link to the supplemental release in the data 
-% repository
+% repository: 
+% https://doi.org/10.5281/zenodo.15576950
 %
 %
 %
@@ -262,6 +262,7 @@ til.InnerPosition=[1.5,1,8.2,8.2];
 fig.Position(3:4)=til.OuterPosition(3:4)+1;
 
 exportgraphics(fig,[fname,'.eps']);
+savefig(fig,fname);
 
 
 %% Control strategy analysis

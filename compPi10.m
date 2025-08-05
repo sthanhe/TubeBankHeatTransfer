@@ -4,7 +4,7 @@
 %
 % Part of the paper:
 %
-% Thanheiser, S.; Haider, M.
+% Thanheiser, S.
 % Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
 % Proposal for an Extended Model Including Immersed Tube Banks and Particle 
 % Cross-Flow
@@ -14,12 +14,12 @@
 % https://doi.org/10.5281/zenodo.15576311
 %
 % All required files for this script can be found in the software
-% repository: see the link to the supplemental release in the data 
-% repository
+% repository: 
+% https://doi.org/10.5281/zenodo.15576950
 %
 %
 %
-% This function compares the results from particle-convective regressions 
+% This script compares the results from particle-convective regressions 
 % in "calcPC" to other published models regarding the impact of probe size
 % on the wall-to-bed HTC. 
 %
@@ -119,7 +119,7 @@ end
 
 %% Plot
 %Set up figure
-figidx=10;
+figidx=11;
 fig=figure(figidx);
 clf(fig);
 til=tiledlayout(fig,1,1,'Padding','tight');
@@ -181,6 +181,7 @@ til.OuterPosition=[0,0,9,9];      %1 column
 fig.Position(3:4)=til.OuterPosition(3:4)+0.5;
 
 exportgraphics(fig,[fname,'.eps']);
+savefig(fig,fname);
 
 
 

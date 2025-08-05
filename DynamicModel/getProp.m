@@ -4,7 +4,7 @@
 %
 % Part of the paper:
 %
-% Thanheiser, S.; Haider, M.
+% Thanheiser, S.
 % Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
 % Proposal for an Extended Model Including Immersed Tube Banks and Particle 
 % Cross-Flow

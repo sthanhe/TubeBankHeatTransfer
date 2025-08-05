@@ -4,7 +4,7 @@
 %
 % Part of the paper:
 %
-% Thanheiser, S.; Haider, M.
+% Thanheiser, S.
 % Molerus and Wirth's Heat Transfer Model for Bubbling Fluidized Beds: 
 % Proposal for an Extended Model Including Immersed Tube Banks and Particle 
 % Cross-Flow
@@ -14,8 +14,8 @@
 % https://doi.org/10.5281/zenodo.15576311
 %
 % All required files for this script can be found in the software
-% repository: see the link to the supplemental release in the data 
-% repository
+% repository: 
+% https://doi.org/10.5281/zenodo.15576950
 %
 %
 %
@@ -154,7 +154,7 @@ prim(outliers,:)=[];
 %% Effective HTC
 prim.h_eff=prim.hVirt;
 prim.eta_f=ones(height(prim),1);
-k=55;   %Thermal conductivity of fin material
+k=55;   %Thermal conductivity of fin material, initial estimate (W/mK)
 for i=1:height(prim)
     err=1;
     counter=0;
@@ -340,6 +340,10 @@ end
 
 %Add pi1=Nu_cf to pi-table
 pis.pi1=prim.Nu_cf;
+
+
+%Add Nu_eff to prim-table
+prim.Nu_eff=Nu_eff(pos)-predict(mdl,0);
 
 
 %Save data
